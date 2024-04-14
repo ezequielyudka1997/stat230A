@@ -1,0 +1,26 @@
+                             model
+Dependent Var.:     isib_famincome
+                                  
+isib_age          0.0328* (0.0131)
+sib_agesq        -0.0004* (0.0002)
+isib_race         -0.0279 (0.0744)
+Fixed-Effects:   -----------------
+ipar_wealth                    Yes
+isib_educ                      Yes
+isib_child                     Yes
+isib_married                   Yes
+isib_employ                    Yes
+isib_occupation                Yes
+sib_pension                    Yes
+isib_2home                     Yes
+isib_computeruse               Yes
+isib_riskpref                  Yes
+year                           Yes
+sib_sex                        Yes
+________________ _________________
+S.E.: Clustered         by: sib_id
+Observations                12,835
+R2                         0.47145
+Within R2                  0.00091
+---
+Signif. codes: 0 '***' 0.001 '**' 0.01 '*' 0.05 '.' 0.1 ' ' 1
