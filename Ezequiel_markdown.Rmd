@@ -1,0 +1,152 @@
+---
+title: "Ezequiel_markdown"
+output: pdf_document
+date: "2024-04-29"
+---
+
+We downloaded the data from here: https://www2.census.gov/programs-surveys/acs/data/pums/2022/1-Year/csv_pus.zip
+
+First, we append the files and then we process the data to reduce the size and 
+generate some variables we need
+```{r setup, include=FALSE}
+if (!require("readr")) install.packages("readr", dependencies = TRUE)
+library(readr)
+
+# We append population a, b, c,d  data once
+data_a <- read.csv("/Users/zequi/Desktop/Berkeley/230A/csv_pus/psam_pusa.csv")
+data_b <- read.csv("/Users/zequi/Desktop/Berkeley/230A/csv_pus/psam_pusb.csv")
+data <- rbind(data_a, data_b)
+
+if (!require("dplyr")) install.packages("dplyr", dependencies = TRUE)
+library(dplyr)
+
+data <- data %>%
+  select(ST, DIVISION, AGEP, ESR, CIT, NATIVITY, CITWP, YOEP, COW, DIS, ENG, PAP, FER, MAR, SEX, SCH, SCHL, PINCP, WAGP, ANC, ANC1P, ANC2P, ESR, MIGSP, POBP, RAC1P, PERNP, HISP, HINS4, ADJINC)
+
+write.csv(data, "psam_pus.csv", row.names = FALSE)
+zip("psam_pus.zip", "psam_pus.csv")
+file.remove("psam_pus.csv")
+
+processed_data <- data %>%
+  filter(AGEP >= 18, !ESR %in% c("b", 6)) %>%
+  mutate(
+    Citizen = ifelse(CIT %in% c(1, 2, 3, 4), 1, 0),
+    Foreign_born = ifelse(NATIVITY == 2, 1, 0),
+    High_School_Grad = ifelse(SCHL >= 16 & SCHL < 21, 1, 0),
+    Bachelors_Degree = ifelse(SCHL >= 21, 1, 0),
+    Unemployed = ifelse(ESR == 3, 1, 0),
+    HISP_dummy = ifelse(HISP == 1, 0, 1),
+    Years_in_US = 2022 - YOEP,
+    Years_naturalized = 2022 - CITWP,
+    SEX = as.numeric(SEX) - 1,
+    HINS4 = as.numeric(HINS4) - 1,
+    Asian = ifelse(RAC1P ==6, 1, 0)
+  )
+
+write.csv(processed_data, "processed_data.csv", row.names = FALSE)
+zip("processed_data.zip", "processed_data.csv")
+file.remove("processed_data.csv")
+```
+
+
+We bring the processed data:
+```{r setup, include=FALSE}
+zip_file_path <- "/Users/zequi/Desktop/Berkeley/230A/stat230A/processed_data.zip"
+csv_file_inside_zip <- "processed_data.csv"
+
+processed_data <- read.csv(unzip(zip_file_path, files = csv_file_inside_zip))
+```
+
+
+We do some extra processing:
+```{r setup, include=FALSE}
+library(tidyr)
+library(dplyr)
+
+processed_data <- processed_data %>%
+  mutate(
+    DIS = as.numeric(DIS) - 1
+  )
+
+print(unique(processed_data$SEX))
+processed_data$SEX <- factor(processed_data$SEX)
+print(levels(processed_data$SEX))
+processed_data$DIS <- factor(processed_data$DIS)
+processed_data$ENG <- factor(processed_data$ENG)
+processed_data$FER <- factor(processed_data$FER)
+processed_data$MAR <- factor(processed_data$MAR)
+processed_data$High_School_Grad <- factor(processed_data$High_School_Grad)
+processed_data$Bachelors_Degree <- factor(processed_data$Bachelors_Degree)
+processed_data$HISP_dummy <- factor(processed_data$HISP_dummy)
+processed_data$Asian <- factor(processed_data$Asian)
+processed_data$Unemployed <- factor(processed_data$Unemployed)
+processed_data$ST <- factor(processed_data$ST)
+```
+
+
+Logistics regression: Predict Employment status
+```{r setup, include=FALSE}
+employment_status_model <- glm(Unemployed ~  SEX + AGEP + ST + DIS + PAP + MAR + High_School_Grad + Bachelors_Degree + HISP_dummy + Asian + Years_naturalized + Years_in_US, data = processed_data, family = binomial())
+summary(employment_status_model)
+```
+
+Logistics regression: Risk of poverty
+```{r setup, include=FALSE}
+processed_data$PAP_binary = as.numeric(processed_data$PAP > 0)
+poverty_risk_model <- glm(PAP_binary ~ SEX + ST + AGEP + DIS + Unemployed + MAR + High_School_Grad + Bachelors_Degree + HISP_dummy + Years_in_US + Asian + Years_naturalized, family = binomial(), data = processed_data)
+summary(poverty_risk_model)
+```
+
+Logistics regression: Probability of being on medicaid (HINS4)
+```{r setup, include=FALSE}
+medicaid_model <- glm(HINS4 ~ ST + AGEP + DIS + Unemployed + MAR + High_School_Grad + Bachelors_Degree + HISP_dummy + Asian + Years_in_US + Years_naturalized, family = binomial(), data = processed_data)
+summary(medicaid_model)
+```
+
+
+Ethnic Blinder Oxaca
+```{r setup, include=FALSE}
+if (!require(oaxaca)) install.packages("oaxaca")
+library(oaxaca)
+
+oaxaca_data <- processed_data[processed_data$PERNP > 0, ]
+oaxaca_data$Log_PERNP <- log(oaxaca_data$PERNP)
+
+oaxaca_data$PERNP <- as.numeric(oaxaca_data$PERNP)
+oaxaca_data$Ethnic_interest <- ifelse(oaxaca_data$HISP_dummy == 1 | oaxaca_data$Asian == 1, 1, 0)
+oaxaca_data$Ethnic_interest <- as.factor(oaxaca_data$Ethnic_interest)
+
+print(unique(oaxaca_data$SEX))
+oaxaca_data$SEX <- factor(oaxaca_data$SEX)
+print(levels(oaxaca_data$SEX))
+
+table(oaxaca_data$SEX, oaxaca_data$Ethnic_interest)
+sum(is.na(oaxaca_data$SEX))
+
+ethnic_oaxaca <- oaxaca(
+  formula = log(PERNP) ~ SEX + AGEP + High_School_Grad | Ethnic_interest,
+  data = oaxaca_data
+)
+
+oaxaca_data$SEX <- factor(oaxaca_data$SEX, levels = c("0", "1"))
+
+ethnic_oaxaca <- oaxaca(
+  formula = log(PERNP) ~ ST + SEX+ AGEP + DIS + MAR + High_School_Grad + Bachelors_Degree + Years_in_US + Years_naturalized | Ethnic_interest,
+  data = oaxaca_data
+)
+View(summary(ethnic_oaxaca))
+```
+
+
+Migrant Blinder Oxaca
+```{r setup, include=FALSE}
+
+colnames(oaxaca_data)
+
+migrant_oaxaca <- oaxaca(
+  formula = log(PERNP) ~ ST + SEX + AGEP + DIS + MAR + High_School_Grad + Bachelors_Degree | Foreign_born,
+  #FER ENG
+  data = oaxaca_data
+)
+View(summary(migrant_oaxaca))
+```

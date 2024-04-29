@@ -46,9 +46,19 @@ file.remove("processed_data.csv")
 
 ################################################################################
 ################################################################################
-####################             Cleaning 2022             #####################
+####################             Project             #####################
 ################################################################################
 ################################################################################
+fixed effect
+CITIXZN, FOREING BORN, FER, ENG
+MARKDOWN
+processed_data$Citizen <- factor(processed_data$Citizen)
+processed_data$Citizen <- relevel(processed_data$Citizen, ref = "0")
+
+
+
+
+
 zip_file_path <- "/Users/zequi/Desktop/Berkeley/230A/stat230A/processed_data.zip"
 csv_file_inside_zip <- "processed_data.csv"
 
@@ -60,46 +70,60 @@ processed_data <- read.csv(unzip(zip_file_path, files = csv_file_inside_zip))
 library(tidyr)
 library(dplyr)
 
-if (!require(fastDummies)) install.packages("fastDummies")
-library(fastDummies)
-
-processed_data$ST <- as.factor(processed_data$ST)
-processed_data <- dummy_cols(processed_data, select_columns = "ST", remove_first_dummy = TRUE)
-
-processed_data$DIVISION <- as.factor(processed_data$DIVISION)
-processed_data <- dummy_cols(processed_data, select_columns = "DIVISION", remove_first_dummy = TRUE)
+#if (!require(fastDummies)) install.packages("fastDummies")
+#library(fastDummies)
 
 processed_data <- processed_data %>%
-  select(-ST, -DIVISION)
+  mutate(
+    DIS = as.numeric(DIS) - 1
+  )
 
+print(unique(processed_data$SEX))
+processed_data$SEX <- factor(processed_data$SEX)
+print(levels(processed_data$SEX))
 
-table(processed_data$SEX)
-table(processed_data$Foreign_born)
-chisq.test(processed_data$SEX, processed_data$Foreign_born)
+#print(unique(processed_data$Citizen))
+#print(levels(processed_data$Citizen))
+processed_data$Citizen <- factor(processed_data$Citizen)
+processed_data$Citizen <- relevel(processed_data$Citizen, ref = "0")
 
-table(processed_data$SEX)
-table(processed_data$Citizen)
-chisq.test(processed_data$SEX, processed_data$Citizen)
+processed_data$DIS <- factor(processed_data$DIS)
+processed_data$ENG <- factor(processed_data$ENG)
+processed_data$FER <- factor(processed_data$FER)
+processed_data$MAR <- factor(processed_data$MAR)
+processed_data$High_School_Grad <- factor(processed_data$High_School_Grad)
+processed_data$Bachelors_Degree <- factor(processed_data$Bachelors_Degree)
+processed_data$HISP_dummy <- factor(processed_data$HISP_dummy)
+processed_data$Asian <- factor(processed_data$Asian)
+processed_data$Unemployed <- factor(processed_data$Unemployed)
+processed_data$ST <- factor(processed_data$ST)
+
+#processed_data <- dummy_cols(processed_data, select_columns = "DIVISION", remove_first_dummy = TRUE)
+
 
 #*Logistics regression
 #**First: Predict Employment status
-employment_status_model <- glm(Unemployed ~ ST_2 + ST_4 + ST_5 + ST_6 + ST_8 + ST_9 + ST_10 + ST_11 + ST_12 + ST_13 + ST_15 + ST_16 + ST_17 + ST_18 + ST_19 + ST_20 + ST_21 + ST_22 + ST_23 + ST_24 + ST_25 + ST_26 + ST_27 + ST_28 + ST_29 + ST_30 + ST_31 + ST_32 + ST_33 + ST_34 + ST_35 + ST_36 + ST_37 + ST_38 + ST_39 + ST_40 + ST_41 + ST_42 + ST_44 + ST_45 + ST_46 + ST_47 + ST_48 + ST_49 + ST_50 + ST_51 + ST_53 + ST_54 + ST_55 + ST_56 + AGEP + DIS + ENG + PAP + FER + MAR + High_School_Grad + Bachelors_Degree + HISP_dummy + Asian + Years_in_US + Years_naturalized, data = processed_data, family = binomial())
+employment_status_model <- glm(Unemployed ~  SEX + AGEP + ST + DIS + PAP + MAR + High_School_Grad + Bachelors_Degree + HISP_dummy + Asian + Years_naturalized + Years_in_US, data = processed_data, family = binomial())
+#employment_status_model <- glm(Unemployed ~ SEX +  AGEP + DIS + ENG + PAP + FER + MAR + High_School_Grad + Bachelors_Degree + HISP_dummy + Asian + Years_in_US + Years_naturalized, data = processed_data, family = binomial())
+#employment_status_model <- glm(Unemployed ~ ST_2 + ST_4 + ST_5 + ST_6 + ST_8 + ST_9 + ST_10 + ST_11 + ST_12 + ST_13 + ST_15 + ST_16 + ST_17 + ST_18 + ST_19 + ST_20 + ST_21 + ST_22 + ST_23 + ST_24 + ST_25 + ST_26 + ST_27 + ST_28 + ST_29 + ST_30 + ST_31 + ST_32 + ST_33 + ST_34 + ST_35 + ST_36 + ST_37 + ST_38 + ST_39 + ST_40 + ST_41 + ST_42 + ST_44 + ST_45 + ST_46 + ST_47 + ST_48 + ST_49 + ST_50 + ST_51 + ST_53 + ST_54 + ST_55 + ST_56 + AGEP + DIS + ENG + PAP + FER + MAR + High_School_Grad + Bachelors_Degree + HISP_dummy + Asian + Years_in_US + Years_naturalized, data = processed_data, family = binomial())
 #+ SEX + Citizen + Foreign_born
+#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!years in us, FER, ENG
 summary(employment_status_model)
 
 #**Risk of poverty: 
 #***Probability of PAP > 0 
 processed_data$PAP_binary = as.numeric(processed_data$PAP > 0)
-poverty_risk_model <- glm(PAP_binary ~ ST_2 + ST_4 + ST_5 + ST_6 + ST_8 + ST_9 + ST_10 + ST_11 + ST_12 + ST_13 + ST_15 + ST_16 + ST_17 + ST_18 + ST_19 + ST_20 + ST_21 + ST_22 + ST_23 + ST_24 + ST_25 + ST_26 + ST_27 + ST_28 + ST_29 + ST_30 + ST_31 + ST_32 + ST_33 + ST_34 + ST_35 + ST_36 + ST_37 + ST_38 + ST_39 + ST_40 + ST_41 + ST_42 + ST_44 + ST_45 + ST_46 + ST_47 + ST_48 + ST_49 + ST_50 + ST_51 + ST_53 + ST_54 + ST_55 + ST_56 + AGEP + DIS + ENG + Unemployed + FER + MAR + High_School_Grad + Bachelors_Degree + HISP_dummy + Asian + Years_in_US + Years_naturalized, family = binomial(), data = processed_data)
+#processed_data$PAP_binary <- factor(processed_data$PAP_binary)
+poverty_risk_model <- glm(PAP_binary ~ SEX + ST + AGEP + DIS + Unemployed + MAR + High_School_Grad + Bachelors_Degree + HISP_dummy + Years_in_US + Asian + Years_naturalized, family = binomial(), data = processed_data)
+#poverty_risk_model <- glm(PAP_binary ~ ST_2 + ST_4 + ST_5 + ST_6 + ST_8 + ST_9 + ST_10 + ST_11 + ST_12 + ST_13 + ST_15 + ST_16 + ST_17 + ST_18 + ST_19 + ST_20 + ST_21 + ST_22 + ST_23 + ST_24 + ST_25 + ST_26 + ST_27 + ST_28 + ST_29 + ST_30 + ST_31 + ST_32 + ST_33 + ST_34 + ST_35 + ST_36 + ST_37 + ST_38 + ST_39 + ST_40 + ST_41 + ST_42 + ST_44 + ST_45 + ST_46 + ST_47 + ST_48 + ST_49 + ST_50 + ST_51 + ST_53 + ST_54 + ST_55 + ST_56 + AGEP + DIS + ENG + Unemployed + FER + MAR + High_School_Grad + Bachelors_Degree + HISP_dummy + Asian + Years_in_US + Years_naturalized, family = binomial(), data = processed_data)
 #+ SEX + Citizen + Foreign_born
 summary(poverty_risk_model)
 
-
 #***Probability of being on medicaid (HINS4)
-medicaid_model <- glm(HINS4 ~ ST_2 + ST_4 + ST_5 + ST_6 + ST_8 + ST_9 + ST_10 + ST_11 + ST_12 + ST_13 + ST_15 + ST_16 + ST_17 + ST_18 + ST_19 + ST_20 + ST_21 + ST_22 + ST_23 + ST_24 + ST_25 + ST_26 + ST_27 + ST_28 + ST_29 + ST_30 + ST_31 + ST_32 + ST_33 + ST_34 + ST_35 + ST_36 + ST_37 + ST_38 + ST_39 + ST_40 + ST_41 + ST_42 + ST_44 + ST_45 + ST_46 + ST_47 + ST_48 + ST_49 + ST_50 + ST_51 + ST_53 + ST_54 + ST_55 + ST_56 + AGEP + DIS + ENG + Unemployed + FER + MAR + High_School_Grad + Bachelors_Degree + HISP_dummy + Asian + Years_in_US + Years_naturalized, family = binomial(), data = processed_data)
+medicaid_model <- glm(HINS4 ~ ST + AGEP + DIS + Unemployed + MAR + High_School_Grad + Bachelors_Degree + HISP_dummy + Asian + Years_in_US + Years_naturalized, family = binomial(), data = processed_data)
+#medicaid_model <- glm(HINS4 ~ ST_2 + ST_4 + ST_5 + ST_6 + ST_8 + ST_9 + ST_10 + ST_11 + ST_12 + ST_13 + ST_15 + ST_16 + ST_17 + ST_18 + ST_19 + ST_20 + ST_21 + ST_22 + ST_23 + ST_24 + ST_25 + ST_26 + ST_27 + ST_28 + ST_29 + ST_30 + ST_31 + ST_32 + ST_33 + ST_34 + ST_35 + ST_36 + ST_37 + ST_38 + ST_39 + ST_40 + ST_41 + ST_42 + ST_44 + ST_45 + ST_46 + ST_47 + ST_48 + ST_49 + ST_50 + ST_51 + ST_53 + ST_54 + ST_55 + ST_56 + AGEP + DIS + ENG + Unemployed + FER + MAR + High_School_Grad + Bachelors_Degree + HISP_dummy + Asian + Years_in_US + Years_naturalized, family = binomial(), data = processed_data)
 #+ SEX + Citizen + Foreign_born
 summary(medicaid_model)
-
 
 
 #*Blinder-Oaxaca
@@ -114,11 +138,27 @@ oaxaca_data$PERNP <- as.numeric(oaxaca_data$PERNP)
 oaxaca_data$Ethnic_interest <- ifelse(oaxaca_data$HISP_dummy == 1 | oaxaca_data$Asian == 1, 1, 0)
 oaxaca_data$Ethnic_interest <- as.factor(oaxaca_data$Ethnic_interest)
 
+print(unique(oaxaca_data$SEX))
+oaxaca_data$SEX <- factor(oaxaca_data$SEX)
+print(levels(oaxaca_data$SEX))
+
+table(oaxaca_data$SEX, oaxaca_data$Ethnic_interest)
+sum(is.na(oaxaca_data$SEX))
+
 ethnic_oaxaca <- oaxaca(
-  formula = log(PERNP) ~ ST_2 + ST_4 + ST_5 + ST_6 + ST_8 + ST_9 + ST_10 + ST_11 + ST_12 + ST_13 + ST_15 + ST_16 + ST_17 + ST_18 + ST_19 + ST_20 + ST_21 + ST_22 + ST_23 + ST_24 + ST_25 + ST_26 + ST_27 + ST_28 + ST_29 + ST_30 + ST_31 + ST_32 + ST_33 + ST_34 + ST_35 + ST_36 + ST_37 + ST_38 + ST_39 + ST_40 + ST_41 + ST_42 + ST_44 + ST_45 + ST_46 + ST_47 + ST_48 + ST_49 + ST_50 + ST_51 + ST_53 + ST_54 + ST_55 + ST_56 + AGEP + DIS + ENG + Unemployed + FER + MAR + High_School_Grad + Bachelors_Degree + Years_in_US + Years_naturalized | Ethnic_interest,
+  formula = log(PERNP) ~ SEX + AGEP + High_School_Grad | Ethnic_interest,
+  data = oaxaca_data
+)
+
+oaxaca_data$SEX <- factor(oaxaca_data$SEX, levels = c("0", "1"))
+
+ethnic_oaxaca <- oaxaca(
+  formula = log(PERNP) ~ ST + SEX+ AGEP + DIS + MAR + High_School_Grad + Bachelors_Degree + Years_in_US + Years_naturalized | Ethnic_interest,
   data = oaxaca_data
 )
 #!!SEX, CIT, FOREING BORN
+#FER ENG
+#unemployed?
 View(summary(ethnic_oaxaca))
 
 #beta: Contains lists of estimated coefficients for different models:
@@ -140,8 +180,10 @@ View(summary(ethnic_oaxaca))
 colnames(oaxaca_data)
 
 migrant_oaxaca <- oaxaca(
-  formula = log(PERNP) ~ ST_2 + ST_4 + ST_5 + ST_6 + ST_8 + ST_9 + ST_10 + ST_11 + ST_12 + ST_13 + ST_15 + ST_16 + ST_17 + ST_18 + ST_19 + ST_20 + ST_21 + ST_22 + ST_23 + ST_24 + ST_25 + ST_26 + ST_27 + ST_28 + ST_29 + ST_30 + ST_31 + ST_32 + ST_33 + ST_34 + ST_35 + ST_36 + ST_37 + ST_38 + ST_39 + ST_40 + ST_41 + ST_42 + ST_44 + ST_45 + ST_46 + ST_47 + ST_48 + ST_49 + ST_50 + ST_51 + ST_53 + ST_54 + ST_55 + ST_56 + AGEP + DIS + ENG + Unemployed + FER + MAR + High_School_Grad + Bachelors_Degree | Foreign_born,
+  formula = log(PERNP) ~ ST + SEX + AGEP + DIS + MAR + High_School_Grad + Bachelors_Degree | Foreign_born,
+  #FER ENG
   data = oaxaca_data
 )
+#unemployed?
 #!!SEX, CIT, FOREING BORN
 View(summary(migrant_oaxaca))
