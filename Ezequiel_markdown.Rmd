@@ -48,7 +48,6 @@ zip("processed_data.zip", "processed_data.csv")
 file.remove("processed_data.csv")
 ```
 
-
 We bring the processed data:
 ```{r setup, include=FALSE}
 zip_file_path <- "/Users/zequi/Desktop/Berkeley/230A/stat230A/processed_data.zip"
@@ -57,7 +56,6 @@ csv_file_inside_zip <- "processed_data.csv"
 processed_data <- read.csv(unzip(zip_file_path, files = csv_file_inside_zip))
 ```
 
-
 We do some extra processing:
 ```{r setup, include=FALSE}
 library(tidyr)
@@ -65,12 +63,12 @@ library(dplyr)
 
 processed_data <- processed_data %>%
   mutate(
-    DIS = as.numeric(DIS) - 1
+    DIS = as.numeric(DIS) - 1,
+    HINS4 = 1 - as.numeric(HINS4),
+    Citizen = ifelse(CIT %in% c(1, 3, 4), 1, 0)
   )
 
-print(unique(processed_data$SEX))
 processed_data$SEX <- factor(processed_data$SEX)
-print(levels(processed_data$SEX))
 processed_data$DIS <- factor(processed_data$DIS)
 processed_data$ENG <- factor(processed_data$ENG)
 processed_data$FER <- factor(processed_data$FER)
@@ -81,57 +79,57 @@ processed_data$HISP_dummy <- factor(processed_data$HISP_dummy)
 processed_data$Asian <- factor(processed_data$Asian)
 processed_data$Unemployed <- factor(processed_data$Unemployed)
 processed_data$ST <- factor(processed_data$ST)
+processed_data$DIVISION <- factor(processed_data$DIVISION)
+processed_data$Citizen <- factor(processed_data$Citizen)
+processed_data$Foreign_born <- factor(processed_data$Foreign_born)
 ```
-
 
 Logistics regression: Predict Employment status
 ```{r setup, include=FALSE}
-employment_status_model <- glm(Unemployed ~  SEX + AGEP + ST + DIS + PAP + MAR + High_School_Grad + Bachelors_Degree + HISP_dummy + Asian + Years_naturalized + Years_in_US, data = processed_data, family = binomial())
+employment_status_model <- glm(Unemployed ~  SEX + DIVISION + Citizen + ENG + AGEP + DIS + PAP + MAR + High_School_Grad + Bachelors_Degree + HISP_dummy + Asian, data = processed_data, family = binomial())
 summary(employment_status_model)
 ```
 
 Logistics regression: Risk of poverty
 ```{r setup, include=FALSE}
 processed_data$PAP_binary = as.numeric(processed_data$PAP > 0)
-poverty_risk_model <- glm(PAP_binary ~ SEX + ST + AGEP + DIS + Unemployed + MAR + High_School_Grad + Bachelors_Degree + HISP_dummy + Years_in_US + Asian + Years_naturalized, family = binomial(), data = processed_data)
+poverty_risk_model <- glm(PAP_binary ~ SEX + ST + ENG + AGEP + DIS + Unemployed + MAR + High_School_Grad + Bachelors_Degree + HISP_dummy + Asian, family = binomial(), data = processed_data)
 summary(poverty_risk_model)
 ```
 
 Logistics regression: Probability of being on medicaid (HINS4)
 ```{r setup, include=FALSE}
-medicaid_model <- glm(HINS4 ~ ST + AGEP + DIS + Unemployed + MAR + High_School_Grad + Bachelors_Degree + HISP_dummy + Asian + Years_in_US + Years_naturalized, family = binomial(), data = processed_data)
+medicaid_model <- glm(HINS4 ~ SEX + ST + ENG + AGEP + DIS + Unemployed + MAR + High_School_Grad + Bachelors_Degree + HISP_dummy + Asian, family = binomial(), data = processed_data)
 summary(medicaid_model)
 ```
 
+```{r setup, include=FALSE}
+missing_percentage <- processed_data %>%
+  summarise(
+    Missing_Citizen = sum(is.na(Citizen)) / n() * 100,
+    Missing_Foreign_born = sum(is.na(Foreign_born)) / n() * 100,
+    Missing_FER = sum(is.na(FER)) / n() * 100,
+    Missing_ENG = sum(is.na(ENG)) / n() * 100
+  )
 
-Ethnic Blinder Oxaca
+View(missing_percentage)
+```
+
 ```{r setup, include=FALSE}
 if (!require(oaxaca)) install.packages("oaxaca")
 library(oaxaca)
 
 oaxaca_data <- processed_data[processed_data$PERNP > 0, ]
-oaxaca_data$Log_PERNP <- log(oaxaca_data$PERNP)
-
 oaxaca_data$PERNP <- as.numeric(oaxaca_data$PERNP)
+```
+
+Ethnic Blinder Oxaca
+```{r setup, include=FALSE}
 oaxaca_data$Ethnic_interest <- ifelse(oaxaca_data$HISP_dummy == 1 | oaxaca_data$Asian == 1, 1, 0)
 oaxaca_data$Ethnic_interest <- as.factor(oaxaca_data$Ethnic_interest)
 
-print(unique(oaxaca_data$SEX))
-oaxaca_data$SEX <- factor(oaxaca_data$SEX)
-print(levels(oaxaca_data$SEX))
-
-table(oaxaca_data$SEX, oaxaca_data$Ethnic_interest)
-sum(is.na(oaxaca_data$SEX))
-
 ethnic_oaxaca <- oaxaca(
-  formula = log(PERNP) ~ SEX + AGEP + High_School_Grad | Ethnic_interest,
-  data = oaxaca_data
-)
-
-oaxaca_data$SEX <- factor(oaxaca_data$SEX, levels = c("0", "1"))
-
-ethnic_oaxaca <- oaxaca(
-  formula = log(PERNP) ~ ST + SEX+ AGEP + DIS + MAR + High_School_Grad + Bachelors_Degree + Years_in_US + Years_naturalized | Ethnic_interest,
+  formula = log(PERNP) ~ SEX+ ST + ENG + AGEP + DIS + MAR + High_School_Grad + Bachelors_Degree+ Years_in_US | Ethnic_interest,
   data = oaxaca_data
 )
 View(summary(ethnic_oaxaca))
@@ -140,12 +138,8 @@ View(summary(ethnic_oaxaca))
 
 Migrant Blinder Oxaca
 ```{r setup, include=FALSE}
-
-colnames(oaxaca_data)
-
 migrant_oaxaca <- oaxaca(
-  formula = log(PERNP) ~ ST + SEX + AGEP + DIS + MAR + High_School_Grad + Bachelors_Degree | Foreign_born,
-  #FER ENG
+  formula = log(PERNP) ~ SEX + ST + ENG + AGEP + DIS + MAR + High_School_Grad + Bachelors_Degree | Foreign_born,
   data = oaxaca_data
 )
 View(summary(migrant_oaxaca))
