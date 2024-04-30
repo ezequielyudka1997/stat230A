@@ -63,7 +63,7 @@ library(dplyr)
 
 processed_data <- processed_data %>%
   mutate(
-    DIS = as.numeric(DIS) - 1, #I suggest this instead ifelse(DIS == 2, 1, 0)
+    DIS = ifelse(DIS == 2, 1, 0), #I suggest this instead ifelse(DIS == 2, 1, 0)
     HINS4 = 1 - as.numeric(HINS4),
     Citizen = ifelse(CIT %in% c(1, 3, 4), 1, 0)
   )
@@ -86,7 +86,7 @@ processed_data$Foreign_born <- factor(processed_data$Foreign_born)
 
 Logistics regression: Predict Employment status
 ```{r setup, include=FALSE}
-employment_status_model <- glm(Unemployed ~  SEX + DIVISION + Citizen + ENG + AGEP + DIS + PAP + MAR + High_School_Grad + Bachelors_Degree + HISP_dummy + Asian, data = processed_data, family = binomial())
+employment_status_model <- glm(Unemployed ~  SEX + ST + Citizen + ENG + AGEP + DIS + PAP + MAR + High_School_Grad + Bachelors_Degree + HISP_dummy + Asian, data = processed_data, family = binomial())
 summary(employment_status_model)
 ```
 
