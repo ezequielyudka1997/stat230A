@@ -1,0 +1,290 @@
+---
+title: "230A - Group Project"
+format: pdf
+editor: visual
+---
+
+```{r, message=FALSE}
+library(tidyverse)
+library(gridExtra)
+library(plm)
+```
+
+
+```{r}
+zip_file_path <- "processed_data.zip"
+csv_file_inside_zip <- "processed_data.csv"
+
+processed_data <- read.csv(unzip(zip_file_path, files = csv_file_inside_zip))
+```
+
+```{r}
+processed_data <- processed_data %>%
+  mutate(
+    DIS = ifelse(DIS == 2, 0, 1),
+    HINS4 = 1 - as.numeric(HINS4))
+```
+
+```{r}
+processed_data$ENG[is.na(processed_data$ENG)] <- 0
+```
+
+Data Dictionary: 
+
+ST: State
+
+DIVISION: Division code based on 2010 Census definitions Division code based on
+2020 Census definitions
+0 .Puerto Rico
+1 .New England (Northeast region)
+2 .Middle Atlantic (Northeast region)
+3 .East North Central (Midwest region)
+4 .West North Central (Midwest region)
+5 .South Atlantic (South region)
+6 .East South Central (South region)
+7 .West South Central (South Region)
+8 .Mountain (West region)
+
+AGEP: Age
+0 .Under 1 year
+1..99 .1 to 99 years (Top-coded)
+
+ESR: 
+  1 .Civilian employed, at work
+  2 .Civilian employed, with a job but not at work
+  3 .Unemployed
+  4 .Armed forces, at work
+  5 .Armed forces, with a job but not at work
+  
+NATIVITY: Nativity
+1 .Native
+2 .Foreign born
+  
+CIT:  Citizenship status
+1 .Born in the United States
+2 .Born in Puerto Rico, Guam, the U.S. Virgin Islands, or
+.Northern Marianas
+3 .Born abroad of U.S. citizen parent or parents
+4 .U.S. citizen by naturalization
+5 .Not a U.S. citizen  
+  
+CITWP:  Year of naturalization 
+  bbbb: N/A (Not eligible - not naturalized)
+
+YOEP: Year of entry
+  bbbb .N/A (Not eligible - Born in the US)
+
+COW: Class of worker
+b .N/A (NILF who last worked more than 5 years ago or never worked)
+1 .Employee of a private for-profit company or business, or of an
+.individual, for wages, salary, or commissions
+2 .Employee of a private not-for-profit, tax-exempt, or
+.charitable organization
+3 .Local government employee (city, county, etc.)
+4 .State government employee
+5 .Federal government employee
+6 .Self-employed in own not incorporated business, professional
+.practice, or farm
+7 .Self-employed in own incorporated business, professional
+.practice or farm
+8 .Working without pay in family business or farm
+9 .Unemployed and last worked 5 years ago or earlier or never
+.worked
+  
+Disability: 
+1 .With a disability
+2 .Without a disability
+
+ENG: Ability to speak English
+0 .speaks only English
+1 .Very well
+2 .Well
+3 .Not well
+4 .Not at all  
+
+PAP: Public assistance income past 12 months (use ADJINC to adjust to
+constant dollars)
+0 .None
+4..30000 .$4 to $30000 (Rounded and top-coded)  
+
+FER: Gave birth to child within the past 12 months
+b .N/A (greater than 50 years/ male)
+1 .Yes
+2. No
+
+MAR: Marital status
+1 .Married
+2 .Widowed
+3 .Divorced
+4 .Separated
+5 .Never married
+
+SEX: Sex
+0 .Male
+1 .Female
+
+SCH: School enrollment
+1 .No, has not attended in the last 3 months
+2 .Yes, public school or public college
+3 .Yes, private school or college or home school
+  
+SCHL: Educational attainment
+01 .No schooling completed
+02 .Nursery school, preschool
+03 .Kindergarten
+04 .Grade 1
+05 .Grade 2
+06 .Grade 3
+07 .Grade 4
+08 .Grade 5
+09 .Grade 6
+10 .Grade 7
+11 .Grade 8
+12 .Grade 9
+13 .Grade 10
+14 .Grade 11
+15 .12th grade - no diploma
+16 .Regular high school diploma
+17 .GED or alternative credential
+18 .Some college, but less than 1 year
+19 .1 or more years of college credit, no degree
+20 .Associate's degree
+21 .Bachelor's degree
+22 .Master's degree
+23 .Professional degree beyond a bachelor's degree
+24 .Doctorate degree
+
+PINCP: Total person's income (use ADJINC to adjust to constant dollars)
+0 .None
+-19998 .Loss of $19998 or more (Rounded and bottom-coded components)
+-19997..-1 .Loss $1 to $19997 (Rounded components)
+1..4209995 .$1 to $4209995 (Rounded and top-codedcomponents)
+
+WAGP: Wages or salary income past 12 months (use ADJINC to adjust WAGP to
+constant dollars)
+0 .None
+4..999999 .$4 to 999999 (Rounded and top-coded)
+
+ANC: Ancestry recode
+1 .Single
+2 .Multiple
+3 .Unclassified
+4 .Not reported
+ANC1P: Recoded Detailed Ancestry - first entry
+ANC2P: Recoded Detailed Ancestry - second entry
+
+POBP: Place of birth (Recode)
+
+RAC1P: Recoded detailed race code
+1 .White alone
+2 .Black or African American alone
+3 .American Indian alone
+4 .Alaska Native alone
+5 .American Indian and Alaska Native tribes specified; or American Indian or Alaska Native, not specified and no other races
+6 .Asian alone
+7 .Native Hawaiian and Other Pacific Islander alone
+8 .Some Other Race alone
+9 .Two or More Races
+
+PERNP: Total person's earnings (use ADJINC to adjust to constant dollars)
+0 .No earnings
+-10000 .Loss of $10000 or more (Rounded and bottom-coded components)
+-9999..-1 .Loss $1 to $9999 (Rounded components)
+1..1999998 .$1 to $1999998 (Rounded and top-coded components)
+
+HISP: Recoded detailed Hispanic origin
+
+HINS4:Medicaid, Medical Assistance, or any kind of government-assistance plan
+for those with low incomes or a disability
+1 .Yes
+0 .No
+
+Citizen: ifelse(CIT %in% c(1, 2, 3, 4), 1, 0)
+Foreign_born: ifelse(NATIVITY == 2, 1, 0)
+High_School_Grad: ifelse(SCHL >= 16 & SCHL < 21, 1, 0)
+Bachelors_Degree: ifelse(SCHL >= 21, 1, 0)
+Unemployed: ifelse(ESR == 3, 1, 0)
+HISP_dummy: ifelse(HISP == 1, 0, 1)
+Years_in_US: 2022 - YOEP
+Years_naturalized: 2022 - CITWP
+Asian: ifelse(RAC1P ==6, 1, 0)
+
+```{r}
+#colnames(processed_data)
+```
+
+```{r}
+processed_data$Years_naturalized[processed_data$Foreign_born == 0] <- 0
+processed_data$Years_in_US[processed_data$Foreign_born == 0] <- 0
+processed_data$Years_naturalized[processed_data$CIT == 5] <- 0
+processed_data = processed_data%>%filter(CIT != 2)
+processed_data$wb50birth <- processed_data$FER
+processed_data$wb50birth[is.na(processed_data$FER) &
+                         (processed_data$AGEP >= 50 | processed_data$SEX == 0)] <- 0
+```
+
+```{r}
+colSums(is.na(processed_data))
+```
+
+https://statsandr.com/blog/anova-in-r/ 
+
+http://www.sthda.com/english/wiki/one-way-anova-test-in-r#compute-one-way-anova-test 
+
+```{r}
+processed_data$adj_WAGP = processed_data$WAGP + 1
+```
+
+```{r}
+a <- ggplot(processed_data,aes(x = WAGP)) + geom_histogram()
+b <- ggplot(processed_data,aes(x = log(adj_WAGP))) + geom_histogram()
+#grid.arrange(a,b, ncol = 2)
+```
+
+
+```{r}
+immigrants_only = processed_data%>%filter(CIT%in% c(4,5))
+immigrants_only2 = immigrants_only%>%filter(RAC1P%in%c(1,2,6,8,9))
+```
+```{r}
+model1 = lm(log(adj_WAGP) ~ as.factor(RAC1P) + AGEP + as.factor(ST) + Years_in_US + DIS, data = immigrants_only2)
+```
+```{r}
+# Get the summary of the model
+summary_model <- summary(model1)
+
+# Filter out rows related to state coefficients
+state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
+summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
+
+# Print the refined summary
+summary_model
+```
+
+```{r}
+#qqnorm(residuals(model1))
+#qqline(residuals(model1))
+```
+
+MR: Differences across earnings for immigrants of different Races
+
+MR: Differences across earnings for Asian immigrants from countries (at least 10%)
+
+MR: Differences across earnings for Asian immigrants from countries (at least 10%)
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
