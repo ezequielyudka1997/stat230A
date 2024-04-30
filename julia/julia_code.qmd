@@ -478,6 +478,7 @@ summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
 summary_model
 ```
 
+
 ```{r}
 model3.1 = lm(log(adj_WAGP) ~ as.factor(RAC1P) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + PAP + HINS4 + immigrant + as.factor(MAR), data = hisp_only)
 ```
