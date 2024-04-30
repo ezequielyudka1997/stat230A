@@ -63,7 +63,7 @@ library(dplyr)
 
 processed_data <- processed_data %>%
   mutate(
-    DIS = ifelse(DIS == 2, 1, 0), #I suggest this instead ifelse(DIS == 2, 1, 0)
+    DIS = ifelse(DIS == 2, 0, 1), 
     HINS4 = 1 - as.numeric(HINS4),
     Citizen = ifelse(CIT %in% c(1, 3, 4), 1, 0)
   )
