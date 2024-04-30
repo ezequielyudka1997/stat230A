@@ -13,8 +13,8 @@ library(plm)
 ```{r}
 zip_file_path <- "../processed_data.zip"
 csv_file_inside_zip <- "processed_data.csv"
-
-processed_data <- read.csv(unzip(zip_file_path, files = csv_file_inside_zip))
+processed_data <- read.csv(unz(zip_file_path, csv_file_inside_zip), header = TRUE,
+                 sep = ",") 
 ```
 
 ```{r}
@@ -241,7 +241,7 @@ immigrants_only2 = immigrants_only%>%filter(RAC1P%in%c(1,2,6,8,9))
 ```
 
 ```{r}
-model1 = lm(log(adj_WAGP) ~ as.factor(RAC1P) + AGEP + Years_in_US + DIS + as.factor(ENG) + SEX + wb50birth + Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + HISP_dummy + Citizen, data = immigrants_only2)
+model1 = lm(log(adj_WAGP) ~ as.factor(RAC1P) + AGEP + Years_in_US + DIS + as.factor(ENG) + SEX + wb50birth + Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + HISP_dummy + Citizen + as.factor(MAR), data = immigrants_only2)
 ```
 
 ```{r}
@@ -278,7 +278,7 @@ asian_only = asian_only%>%filter(POBP %in% largest_subgroup)
 ```
 
 ```{r}
-model2 = lm(log(adj_WAGP) ~  AGEP + Years_in_US + DIS + as.factor(ENG) + SEX + wb50birth + Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + Citizen + as.factor(POBP), data = asian_only)
+model2 = lm(log(adj_WAGP) ~  AGEP + Years_in_US + DIS + as.factor(ENG) + SEX + wb50birth + Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + Citizen + as.factor(POBP) + as.factor(MAR), data = asian_only)
 ```
 
 ```{r}
@@ -304,16 +304,13 @@ largest_subgroup = hisp_only%>%group_by(POBP)%>%
   mutate(per = (count/sum(count))*100)%>%
   arrange(desc(per))%>%head(5)%>%pull(POBP)
 ```
-```{r}
-largest_subgroup
-```
 
 ```{r}
 hisp_only = hisp_only%>%filter(POBP %in% largest_subgroup)
 ```
 
 ```{r}
-model3 = lm(log(adj_WAGP) ~ as.factor(RAC1P) +  AGEP + Years_in_US + DIS + as.factor(ENG) + SEX + wb50birth + Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + Citizen + as.factor(POBP), data = hisp_only)
+model3 = lm(log(adj_WAGP) ~ as.factor(RAC1P) +  AGEP + Years_in_US + DIS + as.factor(ENG) + SEX + wb50birth + Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + Citizen + as.factor(POBP) + as.factor(MAR), data = hisp_only)
 ```
 
 ```{r}
