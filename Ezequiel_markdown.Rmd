@@ -8,7 +8,7 @@ We downloaded the data from here: https://www2.census.gov/programs-surveys/acs/d
 
 First, we append the files and then we process the data to reduce the size and 
 generate some variables we need
-```{r setup, include=FALSE}
+```{r}
 if (!require("readr")) install.packages("readr", dependencies = TRUE)
 library(readr)
 
@@ -49,7 +49,7 @@ file.remove("processed_data.csv")
 ```
 
 We bring the processed data:
-```{r setup, include=FALSE}
+```{r}
 zip_file_path <- "/Users/zequi/Desktop/Berkeley/230A/stat230A/processed_data.zip"
 csv_file_inside_zip <- "processed_data.csv"
 
@@ -57,7 +57,7 @@ processed_data <- read.csv(unzip(zip_file_path, files = csv_file_inside_zip))
 ```
 
 We do some extra processing:
-```{r setup, include=FALSE}
+```{r}
 library(tidyr)
 library(dplyr)
 
@@ -75,176 +75,261 @@ processed_data = processed_data%>%filter(CIT != 2)
 processed_data$Years_naturalized[processed_data$Foreign_born == 0] <- 0
 processed_data$Years_in_US[processed_data$Foreign_born == 0] <- 0
 processed_data$Years_in_US[processed_data$CIT == 5] <- 0
-
-processed_data$SEX <- factor(processed_data$SEX)
-processed_data$DIS <- factor(processed_data$DIS)
-processed_data$ENG <- factor(processed_data$ENG)
-processed_data$FER <- factor(processed_data$FER)
-processed_data$MAR <- factor(processed_data$MAR)
-processed_data$High_School_Grad <- factor(processed_data$High_School_Grad)
-processed_data$Bachelors_Degree <- factor(processed_data$Bachelors_Degree)
-processed_data$HISP_dummy <- factor(processed_data$HISP_dummy)
-processed_data$Asian <- factor(processed_data$Asian)
-processed_data$Unemployed <- factor(processed_data$Unemployed)
-processed_data$ST <- factor(processed_data$ST)
-processed_data$DIVISION <- factor(processed_data$DIVISION)
-processed_data$Citizen <- factor(processed_data$Citizen)
-processed_data$Foreign_born <- factor(processed_data$Foreign_born)
+processed_data$adj_WAGP = processed_data$WAGP + 1
+processed_data = processed_data%>%mutate(immigrant = CIT%in%c(4,5))
 ```
+
+as.factor(RAC1P) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + HISP_dummy + as.factor(MAR) + PAP + HINS4
+
 
 Logistics regression: Predict Employment status
-```{r setup, include=FALSE}
-employment_status_model <- glm(Unemployed ~  SEX + ST + wb50birth + Citizen + ENG + AGEP + DIS + PAP + MAR + High_School_Grad + Bachelors_Degree + HISP_dummy + Asian, data = processed_data, family = binomial())
-summary(employment_status_model)
-```
-*Interesting results:*
--As expected, education reduces the chances of being unemployed:
-  High_School_Grad1 -1.461e-01  2.530e-02  -5.776 7.67e-09 ***
-  Bachelors_Degree1 -5.218e-01  2.988e-02 -17.464  < 2e-16 ***
--Hispanic and asian identified population have a lowe chance of unemployment 
- (hypotehesis: maybe legal reasons so they need to stay employed to stay in the 
- US and as a result are less picky with jobs? Maybe they have more financial 
- necessity to work? look at literature)
-  HISP_dummy1       -2.681e-01  2.288e-02 -11.715  < 2e-16 ***
-  Asian1            -3.050e-01  2.694e-02 -11.319  < 2e-16 ***
--The citizen dummy is not significant.
-  Citizen1          -1.042e-02  2.147e-02  -0.485 0.627473    
--ENG3  and ENG4 are dummies for 'Not well' and 'Not at all' English speaking 
- ability. Having a bad level of English increases the chances of Unemployment,
- which completely makes sense
-  ENG3               1.277e-01  3.056e-02   4.176 2.96e-05 ***
-  ENG4               2.567e-01  4.285e-02   5.991 2.08e-09 ***
+```{r}
+employment_status_model <- glm(Unemployed ~  as.factor(RAC1P) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth + as.factor(ST) + High_School_Grad + Bachelors_Degree + HISP_dummy, data = processed_data, family = binomial())
+#summary(employment_status_model)
 
+summary_model <- summary(employment_status_model)
+state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
+summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
+summary_model
+```
+
+```{r}
+
+```
 
 Logistics regression: Risk of poverty
-```{r setup, include=FALSE}
+#no his4
+```{r}
 processed_data$PAP_binary = as.numeric(processed_data$PAP > 0)
-poverty_risk_model <- glm(PAP_binary ~ SEX + ST + wb50birth + ENG + AGEP + DIS + Unemployed + MAR + High_School_Grad + Bachelors_Degree + HISP_dummy + Asian, family = binomial(), data = processed_data)
-summary(poverty_risk_model)
+poverty_risk_model <- glm(PAP_binary ~ as.factor(RAC1P) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + HISP_dummy + as.factor(MAR), family = binomial(), data = processed_data)
+#summary(poverty_risk_model)
+
+summary_model <- summary(poverty_risk_model)
+state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
+summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
+summary_model
 ```
--Weird pattern, yet ENG4 is not significant.
-  ENG2               0.172680   0.041487   4.162 3.15e-05 ***
-  ENG3               0.204587   0.051790   3.950 7.80e-05 ***
-  ENG4              -0.126444   0.088158  -1.434 0.151491    
-  2 .Well
-  3 .Not well
-  4 .Not at all
--I'm not sure if we should include Unemployes in PAP regression?
--Having a Bachelors degree reduces chances of poverty (expected)
- Bachelors_Degree1 -0.380409   0.054991  -6.918 4.59e-12 ***
--Ethnic minooiorty have a lower chance of poverty. This is really weird.
- HISP_dummy1       -0.239677   0.042603  -5.626 1.85e-08 ***
- Asian1            -0.162657   0.047987  -3.390 0.000700 ***
 
 Logistics regression: Probability of being on medicaid (HINS4)
-```{r setup, include=FALSE}
-medicaid_model <- glm(HINS4 ~ SEX + ST + wb50birth + ENG + AGEP + DIS + Unemployed + MAR + High_School_Grad + Bachelors_Degree + HISP_dummy + Asian, family = binomial(), data = processed_data)
-summary(medicaid_model)
-```
-- The 3 worse levels of English have a significant and positve coefficient.
-  Hyphotesis: worse English, worse jobs, more robability of being on medicaid
-  ENG2               0.2347281  0.0137505  17.071  < 2e-16 ***
-  ENG3               0.4717054  0.0164295  28.711  < 2e-16 ***
-  ENG4               0.2986195  0.0247013  12.089  < 2e-16 ***
--Expected: one would expect that having more years of formal education leads to better financial
- performance and less probability of being on medicaid 
-  High_School_Grad1 -0.2269440  0.0143433 -15.822  < 2e-16 ***
-  Bachelors_Degree1 -1.1922156  0.0181748 -65.597  < 2e-16 ***
--Hipothesis Legal situation?
- HISP_dummy1       -0.1254826  0.0141395  -8.875  < 2e-16 ***
- Asian1            -0.2535197  0.0164209 -15.439  < 2e-16 ***
- 
-```{r setup, include=FALSE}
-missing_percentage <- processed_data %>%
-  summarise(
-    Missing_Citizen = sum(is.na(Citizen)) / n() * 100,
-    Missing_Foreign_born = sum(is.na(Foreign_born)) / n() * 100,
-    Missing_FER = sum(is.na(FER)) / n() * 100,
-    Missing_ENG = sum(is.na(ENG)) / n() * 100
-  )
+```{r}
+medicaid_model <- glm(HINS4 ~ as.factor(RAC1P) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + HISP_dummy + as.factor(MAR), family = binomial(), data = processed_data)
+#summary(medicaid_model)
 
-View(missing_percentage)
+summary_model <- summary(medicaid_model)
+state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
+summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
+summary_model
 ```
 
-```{r setup, include=FALSE}
+```{r}
+#missing_percentage <- processed_data %>%
+#  summarise(
+#    Missing_Citizen = sum(is.na(Citizen)) / n() * 100,
+#    Missing_Foreign_born = sum(is.na(Foreign_born)) / n() * 100,
+#    Missing_FER = sum(is.na(FER)) / n() * 100,
+#    Missing_ENG = sum(is.na(ENG)) / n() * 100
+#  )
+
+#View(missing_percentage)
+```
+
+Repeat the exercise for top Hispanic origins
+```{r}
+immigrants_only = processed_data%>%filter(CIT%in% c(4,5))
+immigrants_only2 = immigrants_only%>%filter(RAC1P%in%c(1,2,6,8,9))
+hisp_only = processed_data%>%filter(HISP_dummy==1)
+hisp_only_im = immigrants_only2%>%filter(HISP_dummy==1)
+
+largest_subgroup = hisp_only_im%>%group_by(POBP)%>%
+  summarise(count = n())%>%
+  mutate(per = (count/sum(count))*100)%>%
+  arrange(desc(per))%>%head(5)%>%pull(POBP)
+
+hisp_only_im = hisp_only_im%>%filter(POBP %in% largest_subgroup)
+```
+
+Hispanic immigrants
+```{r}
+hisp_only_employment_status_model <- glm(Unemployed ~  as.factor(POBP) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth + as.factor(ST) + High_School_Grad + Bachelors_Degree + PAP + HINS4 + immigrant, data = hisp_only_im, family = binomial())
+summary(hisp_only_employment_status_model)
+```
+
+```{r}
+hisp_only_poverty_risk_model <- glm(PAP_binary ~ as.factor(POBP) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + as.factor(MAR) + immigrant, family = binomial(), data = hisp_only_im)
+summary(hisp_only_poverty_risk_model)
+```
+
+```{r}
+hisp_only_medicaid_model <- glm(HINS4 ~ as.factor(POBP) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + as.factor(MAR) + immigrant, family = binomial(), data = hisp_only_im)
+summary(hisp_only_medicaid_model)
+```
+
+Repeat the exercise for top Asian origins
+```{r}
+asian_only = processed_data%>%filter(Asian==1)
+asian_only_im = immigrants_only2%>%filter(Asian==1)
+
+largest_subgroup = asian_only_im%>%group_by(POBP)%>%
+  summarise(count = n())%>%
+  mutate(per = (count/sum(count))*100)%>%
+  arrange(desc(per))%>%head(5)%>%pull(POBP)
+
+asian_only_im = asian_only_im%>%filter(POBP %in% largest_subgroup)
+```
+
+```{r}
+asian_only_employment_status_model <- glm(Unemployed ~  as.factor(POBP) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth + as.factor(ST) + High_School_Grad + Bachelors_Degree + PAP + HINS4 + immigrant, data = asian_only_im, family = binomial())
+summary_model <- summary(asian_only_employment_status_model)
+summary_model
+```
+
+```{r}
+asian_only_poverty_risk_model <- glm(PAP_binary ~ as.factor(POBP) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + as.factor(MAR) + immigrant, family = binomial(), data = asian_only_im)
+summary_model <- summary(asian_only_poverty_risk_model)
+#state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
+#summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
+summary_model
+```
+
+```{r}
+asian_only_medicaid_model <- glm(HINS4 ~ as.factor(POBP) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + as.factor(MAR) + immigrant, family = binomial(), data = hisp_only_im)
+summary_model <- summary(asian_only_medicaid_model)
+#state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
+#summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
+summary_model
+```
+
+Blinder Oxaca
+
+```{r}
 if (!require(oaxaca)) install.packages("oaxaca")
 library(oaxaca)
 
 oaxaca_data <- processed_data[processed_data$PERNP > 0, ]
 oaxaca_data$PERNP <- as.numeric(oaxaca_data$PERNP)
+oaxaca_data <- oaxaca_data[!(oaxaca_data$HISP_dummy == 1 & oaxaca_data$Asian == 1), ]
 ```
 
 Ethnic Blinder Oxaca
-```{r setup, include=FALSE}
+```{r}
 oaxaca_data$Ethnic_interest <- ifelse(oaxaca_data$HISP_dummy == 1 | oaxaca_data$Asian == 1, 1, 0)
 oaxaca_data$Ethnic_interest <- as.factor(oaxaca_data$Ethnic_interest)
 
 ethnic_oaxaca <- oaxaca(
-  formula = log(WAGP+1) ~ SEX+ ST + wb50birth + ENG + AGEP + DIS + MAR + High_School_Grad + Bachelors_Degree+ Years_in_US | Ethnic_interest,
+  formula = log(adj_WAGP) ~ AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + as.factor(MAR) + PAP + HINS4 | Ethnic_interest,
   data = oaxaca_data
 )
 View(summary(ethnic_oaxaca))
 ```
 
-```{r setup, include=FALSE}
+```{r}
 summary(ethnic_oaxaca$reg$reg.A)$coefficients
 ```
-Asian and hispanic population:
--Having a Very well level of enmglish (ENG2=ENG3=ENG4=0) on avarage increases the wage
- ENG2              -0.396184270 0.0285322170 -13.88550599 8.776996e-44
- ENG3              -0.436645934 0.0460912461  -9.47351115 2.780416e-21
- ENG4              -0.628770059 0.1277839985  -4.92056961 8.647344e-07
--More education, more wage on avarage
- High_School_Grad1  0.816593935 0.0414493169  19.70102275 3.477582e-86
- Bachelors_Degree1  1.689988996 0.0420506638  40.18935357 0.000000e+00
--More years in the us has a low but significant effect on wage on avarage
- Years_in_US        0.004132999 0.0008091974   5.10752932 3.271879e-07
 
-```{r setup, include=FALSE}
+```{r}
 summary(ethnic_oaxaca$reg$reg.B)$coefficients
 ```
-Non-Asian and non-hispanic population:
- ENG2              -0.4356727886 0.0140626565 -30.9808314 2.481184e-210
- ENG3              -0.5935524092 0.0177435449 -33.4517376 8.611755e-245
- ENG4              -0.5061385378 0.0257669215 -19.6429573  7.726575e-86
- High_School_Grad1  0.3348168863 0.0159033375  21.0532466  2.606929e-98
- Bachelors_Degree1  1.2458515751 0.0173866468  71.6556558  0.000000e+00
- Years_in_US        0.0034017979 0.0004127845   8.2410991  1.714576e-16
--Educaiton seems to have a greater effec ion Asian and hispanic than on the non-asian non-hispanic
 
+
+```{r}
+overall_effects <- data.frame(
+  Effect = c("Endowments", "Coefficients", "Interaction"),
+  Coefficient = c(ethnic_oaxaca$threefold$overall["coef(endowments)"],
+                  ethnic_oaxaca$threefold$overall["coef(coefficients)"],
+                  ethnic_oaxaca$threefold$overall["coef(interaction)"]),
+  StandardError = c(ethnic_oaxaca$threefold$overall["se(endowments)"],
+                    ethnic_oaxaca$threefold$overall["se(coefficients)"],
+                    ethnic_oaxaca$threefold$overall["se(interaction)"])
+)
+
+variable_effects <- data.frame(
+  Variable = rownames(ethnic_oaxaca$threefold$variables),
+  Endowments = ethnic_oaxaca$threefold$variables[, "coef(endowments)"],
+  Endowments_SE = ethnic_oaxaca$threefold$variables[, "se(endowments)"],
+  Coefficients = ethnic_oaxaca$threefold$variables[, "coef(coefficients)"],
+  Coefficients_SE = ethnic_oaxaca$threefold$variables[, "se(coefficients)"]
+)
+
+selected_variables <- c("AGEP", "SEX", "Citizen", "as.factor(ENG)2", "as.factor(ENG)3",
+                        "as.factor(ENG)4", "DIS", "Unemployed", "High_School_Grad",
+                        "Bachelors_Degree", "PAP", "HINS4",
+                        "SEX:Citizen", "SEX:DIS")
+
+filtered_variable_effects <- variable_effects[variable_effects$Variable %in% selected_variables, ]
+
+ggplot(filtered_variable_effects, aes(x = Variable, y = Endowments, fill = "Endowments")) +
+  geom_col(color = "black", position = position_dodge(width = 0.9)) +
+  geom_errorbar(aes(ymin = Endowments - Endowments_SE, ymax = Endowments + Endowments_SE), width = 0.2, position = position_dodge(width = 0.9)) +
+  labs(title = "Endowment Effects for Selected Variables", x = NULL, y = "Endowment Effect") +
+  scale_fill_manual(values = c("Endowments" = "blue")) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggplot(filtered_variable_effects, aes(x = Variable, y = Coefficients, fill = "Coefficients")) +
+  geom_col(color = "black", position = position_dodge(width = 0.9)) +
+  geom_errorbar(aes(ymin = Coefficients - Coefficients_SE, ymax = Coefficients + Coefficients_SE), width = 0.2, position = position_dodge(width = 0.9)) +
+  labs(title = "Coefficient Effects for Selected Variables", x = NULL, y = "Coefficient Effect") +
+  scale_fill_manual(values = c("Coefficients" = "red")) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
 Migrant Blinder Oxaca
-```{r setup, include=FALSE}
+```{r}
 migrant_oaxaca <- oaxaca(
-  formula = log(WAGP+1) ~ SEX + ST + wb50birth + ENG + AGEP + DIS + MAR + High_School_Grad + Bachelors_Degree | Foreign_born,
+  formula = log(adj_WAGP) ~  AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + as.factor(MAR) + PAP + HINS4 | Foreign_born,
   data = oaxaca_data
 )
+#+ SEX*Citizen, as.factor(RAC1P) +
 View(summary(migrant_oaxaca))
 ```
 
-```{r setup, include=FALSE}
+```{r}
 summary(migrant_oaxaca$reg$reg.A)$coefficients
 ```
-Foreing born:
- ENG2: -0.128631832, SE = 0.0235745565, z = -5.45638396, p < 0.00001 (***)
- ENG3: -0.183876170, SE = 0.0413771167, z = -4.44390971, p < 0.00001 (***)
- ENG4: -0.129259730, SE = 0.1098320504, z = -1.17688534, p = 0.2392436
 
- High_School_Grad1: 0.673456075, SE = 0.0256193516, z = 26.28700705, p < 0.00000001 (***)
- Bachelors_Degree1: 1.441729949, SE = 0.0270357849, z = 53.32672805, p = 0.0000000000 (***)
-
-
-```{r setup, include=FALSE}
+```{r}
 summary(migrant_oaxaca$reg$reg.B)$coefficients
 ```
-Native born:
-  ENG2: -0.473631157, SE = 0.0159525868, z = -29.6899282, p < 0.00000000001 (***)
-  ENG3: -0.601607190, SE = 0.0199094327, z = -30.2171940, p < 0.00000000001 (***)
-  ENG4: -0.529313374, SE = 0.0285967951, z = -18.5095348, p < 0.00000000001 (***)
 
-  High_School_Grad1: 0.255493013, SE = 0.0185898161, z = 13.7437085, p < 0.00000000001 (***)
-  Bachelors_Degree1: 1.216498434, SE = 0.0201265084, z = 60.4425969, p = 0.0000000000 (***)
- 
-The level of English has a greter effect on Native born (makes sense if we 
-consider it to be a requirement for native born and more flexibility for inmigrants).
+```{r}
+overall_effects <- data.frame(
+  Effect = c("Endowments", "Coefficients", "Interaction"),
+  Coefficient = c(migrant_oaxaca$threefold$overall["coef(endowments)"],
+                  migrant_oaxaca$threefold$overall["coef(coefficients)"],
+                  migrant_oaxaca$threefold$overall["coef(interaction)"]),
+  StandardError = c(migrant_oaxaca$threefold$overall["se(endowments)"],
+                    migrant_oaxaca$threefold$overall["se(coefficients)"],
+                    migrant_oaxaca$threefold$overall["se(interaction)"])
+)
 
-Educaion has a greter effect on foreign born.
+variable_effects <- data.frame(
+  Variable = rownames(migrant_oaxaca$threefold$variables),
+  Endowments = migrant_oaxaca$threefold$variables[, "coef(endowments)"],
+  Endowments_SE = migrant_oaxaca$threefold$variables[, "se(endowments)"],
+  Coefficients = migrant_oaxaca$threefold$variables[, "coef(coefficients)"],
+  Coefficients_SE = migrant_oaxaca$threefold$variables[, "se(coefficients)"]
+)
+
+selected_variables <- c("AGEP", "SEX", "Citizen", "as.factor(ENG)2", "as.factor(ENG)3",
+                        "as.factor(ENG)4", "DIS", "Unemployed", "High_School_Grad",
+                        "Bachelors_Degree", "HISP_dummy", "PAP", "HINS4",
+                        "SEX:Citizen", "SEX:DIS")
+
+filtered_variable_effects <- variable_effects[variable_effects$Variable %in% selected_variables, ]
+
+ggplot(filtered_variable_effects, aes(x = Variable, y = Endowments, fill = "Endowments")) +
+  geom_col(color = "black", position = position_dodge(width = 0.9)) +
+  geom_errorbar(aes(ymin = Endowments - Endowments_SE, ymax = Endowments + Endowments_SE), width = 0.2, position = position_dodge(width = 0.9)) +
+  labs(title = "Endowment Effects for Selected Variables", x = NULL, y = "Endowment Effect") +
+  scale_fill_manual(values = c("Endowments" = "blue")) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+
+ggplot(filtered_variable_effects, aes(x = Variable, y = Coefficients, fill = "Coefficients")) +
+  geom_col(color = "black", position = position_dodge(width = 0.9)) +
+  geom_errorbar(aes(ymin = Coefficients - Coefficients_SE, ymax = Coefficients + Coefficients_SE), width = 0.2, position = position_dodge(width = 0.9)) +
+  labs(title = "Coefficient Effects for Selected Variables", x = NULL, y = "Coefficient Effect") +
+  scale_fill_manual(values = c("Coefficients" = "red")) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
