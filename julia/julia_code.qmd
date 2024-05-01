@@ -321,17 +321,6 @@ summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
 summary_model
 ```
 ### qqplot
-```{r}
-residuals_df <- data.frame(residuals = resid(model0))
-ggplot(residuals_df, aes(sample = residuals)) +
-  stat_qq() +
-  stat_qq_line(color = "red") +
-  ggtitle("Normal Q-Q Plot of Residuals") +
-  xlab("Theoretical Quantiles") +
-  ylab("Sample Quantiles") +
-  theme_minimal() +
-  theme(aspect.ratio = 1)
-```
 
 
 ```{r}
