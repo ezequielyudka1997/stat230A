@@ -94,11 +94,24 @@ summary_model
 ```
 
 ```{r}
+fitted_probs <- fitted(employment_status_model)
+residuals <- residuals(employment_status_model, type = "response")
+library(sandwich)
+library(lmtest)
+v <- vcovHC(employment_status_model, type = "HC0")
+variances <- diag(v)
+high_variance_indices <- variances > 0.05
+high_variances <- variances[high_variance_indices]
 
+if (length(high_variances) > 0) {
+    print("Variances higher than 0.05:")
+    print(high_variances)
+} else {
+    print("No variances higher than 0.05.")
+}
 ```
 
 Logistics regression: Risk of poverty
-#no his4
 ```{r}
 processed_data$PAP_binary = as.numeric(processed_data$PAP > 0)
 poverty_risk_model <- glm(PAP_binary ~ as.factor(RAC1P) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + HISP_dummy + as.factor(MAR), family = binomial(), data = processed_data)
@@ -109,7 +122,23 @@ state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients)
 summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
 summary_model
 ```
+```{r}
+fitted_probs <- fitted(poverty_risk_model)
+residuals <- residuals(poverty_risk_model, type = "response")
+library(sandwich)
+library(lmtest)
+v <- vcovHC(poverty_risk_model, type = "HC0")
+variances <- diag(v)
+high_variance_indices <- variances > 0.05
+high_variances <- variances[high_variance_indices]
 
+if (length(high_variances) > 0) {
+    print("Variances higher than 0.05:")
+    print(high_variances)
+} else {
+    print("No variances higher than 0.05.")
+}
+```
 Logistics regression: Probability of being on medicaid (HINS4)
 ```{r}
 medicaid_model <- glm(HINS4 ~ as.factor(RAC1P) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + HISP_dummy + as.factor(MAR), family = binomial(), data = processed_data)
@@ -119,6 +148,23 @@ summary_model <- summary(medicaid_model)
 state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
 summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
 summary_model
+```
+```{r}
+fitted_probs <- fitted(medicaid_model)
+residuals <- residuals(medicaid_model, type = "response")
+library(sandwich)
+library(lmtest)
+v <- vcovHC(medicaid_model, type = "HC0")
+variances <- diag(v)
+high_variance_indices <- variances > 0.05
+high_variances <- variances[high_variance_indices]
+
+if (length(high_variances) > 0) {
+    print("Variances higher than 0.05:")
+    print(high_variances)
+} else {
+    print("No variances higher than 0.05.")
+}
 ```
 
 ```{r}
@@ -151,17 +197,85 @@ hisp_only_im = hisp_only_im%>%filter(POBP %in% largest_subgroup)
 Hispanic immigrants
 ```{r}
 hisp_only_employment_status_model <- glm(Unemployed ~  as.factor(POBP) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth + as.factor(ST) + High_School_Grad + Bachelors_Degree + PAP + HINS4 + immigrant, data = hisp_only_im, family = binomial())
-summary(hisp_only_employment_status_model)
+#summary(hisp_only_employment_status_model)
+
+summary_model <- summary(hisp_only_employment_status_model)
+state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
+filtered_coefficients <- summary_model$coefficients[!state_rows, ]
+summary_model$coefficients <- filtered_coefficients
+print(summary_model$coefficients)
+```
+```{r}
+fitted_probs <- fitted(hisp_only_employment_status_model)
+residuals <- residuals(hisp_only_employment_status_model, type = "response")
+library(sandwich)
+library(lmtest)
+v <- vcovHC(hisp_only_employment_status_model, type = "HC0")
+variances <- diag(v)
+high_variance_indices <- variances > 0.05
+high_variances <- variances[high_variance_indices]
+
+if (length(high_variances) > 0) {
+    print("Variances higher than 0.05:")
+    print(high_variances)
+} else {
+    print("No variances higher than 0.05.")
+}
 ```
 
 ```{r}
 hisp_only_poverty_risk_model <- glm(PAP_binary ~ as.factor(POBP) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + as.factor(MAR) + immigrant, family = binomial(), data = hisp_only_im)
-summary(hisp_only_poverty_risk_model)
+#summary(hisp_only_poverty_risk_model)
+
+summary_model <- summary(hisp_only_poverty_risk_model)
+state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
+filtered_coefficients <- summary_model$coefficients[!state_rows, ]
+summary_model$coefficients <- filtered_coefficients
+print(summary_model$coefficients)
+```
+```{r}
+fitted_probs <- fitted(hisp_only_poverty_risk_model)
+residuals <- residuals(hisp_only_poverty_risk_model, type = "response")
+library(sandwich)
+library(lmtest)
+v <- vcovHC(hisp_only_poverty_risk_model, type = "HC0")
+variances <- diag(v)
+high_variance_indices <- variances > 0.05
+high_variances <- variances[high_variance_indices]
+
+if (length(high_variances) > 0) {
+    print("Variances higher than 0.05:")
+    print(high_variances)
+} else {
+    print("No variances higher than 0.05.")
+}
 ```
 
 ```{r}
 hisp_only_medicaid_model <- glm(HINS4 ~ as.factor(POBP) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + as.factor(MAR) + immigrant, family = binomial(), data = hisp_only_im)
-summary(hisp_only_medicaid_model)
+#summary(hisp_only_medicaid_model)
+summary_model <- summary(hisp_only_medicaid_model)
+state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
+filtered_coefficients <- summary_model$coefficients[!state_rows, ]
+summary_model$coefficients <- filtered_coefficients
+print(summary_model$coefficients)
+```
+```{r}
+fitted_probs <- fitted(hisp_only_medicaid_model)
+residuals <- residuals(hisp_only_medicaid_model, type = "response")
+library(sandwich)
+library(lmtest)
+v <- vcovHC(hisp_only_medicaid_model, type = "HC0")
+variances <- diag(v)
+high_variance_indices <- variances > 0.05
+high_variances <- variances[high_variance_indices]
+
+if (length(high_variances) > 0) {
+    print("Variances higher than 0.05:")
+    print(high_variances)
+} else {
+    print("No variances higher than 0.05.")
+}
 ```
 
 Repeat the exercise for top Asian origins
@@ -179,24 +293,81 @@ asian_only_im = asian_only_im%>%filter(POBP %in% largest_subgroup)
 
 ```{r}
 asian_only_employment_status_model <- glm(Unemployed ~  as.factor(POBP) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth + as.factor(ST) + High_School_Grad + Bachelors_Degree + PAP + HINS4 + immigrant, data = asian_only_im, family = binomial())
+#summary_model <- summary(asian_only_employment_status_model)
 summary_model <- summary(asian_only_employment_status_model)
-summary_model
+state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
+filtered_coefficients <- summary_model$coefficients[!state_rows, ]
+summary_model$coefficients <- filtered_coefficients
+print(summary_model$coefficients)
+```
+```{r}
+fitted_probs <- fitted(asian_only_employment_status_model)
+residuals <- residuals(asian_only_employment_status_model, type = "response")
+library(sandwich)
+library(lmtest)
+v <- vcovHC(asian_only_employment_status_model, type = "HC0")
+variances <- diag(v)
+high_variance_indices <- variances > 0.05
+high_variances <- variances[high_variance_indices]
+
+if (length(high_variances) > 0) {
+    print("Variances higher than 0.05:")
+    print(high_variances)
+} else {
+    print("No variances higher than 0.05.")
+}
 ```
 
 ```{r}
 asian_only_poverty_risk_model <- glm(PAP_binary ~ as.factor(POBP) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + as.factor(MAR) + immigrant, family = binomial(), data = asian_only_im)
 summary_model <- summary(asian_only_poverty_risk_model)
-#state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
-#summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
-summary_model
+state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
+filtered_coefficients <- summary_model$coefficients[!state_rows, ]
+summary_model$coefficients <- filtered_coefficients
+print(summary_model$coefficients)
+```
+```{r}
+fitted_probs <- fitted(asian_only_poverty_risk_model)
+residuals <- residuals(asian_only_poverty_risk_model, type = "response")
+library(sandwich)
+library(lmtest)
+v <- vcovHC(asian_only_poverty_risk_model, type = "HC0")
+variances <- diag(v)
+high_variance_indices <- variances > 0.05
+high_variances <- variances[high_variance_indices]
+
+if (length(high_variances) > 0) {
+    print("Variances higher than 0.05:")
+    print(high_variances)
+} else {
+    print("No variances higher than 0.05.")
+}
 ```
 
 ```{r}
 asian_only_medicaid_model <- glm(HINS4 ~ as.factor(POBP) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + as.factor(MAR) + immigrant, family = binomial(), data = hisp_only_im)
 summary_model <- summary(asian_only_medicaid_model)
-#state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
-#summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
-summary_model
+state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
+filtered_coefficients <- summary_model$coefficients[!state_rows, ]
+summary_model$coefficients <- filtered_coefficients
+print(summary_model$coefficients)
+```
+```{r}
+fitted_probs <- fitted(asian_only_medicaid_model)
+residuals <- residuals(asian_only_medicaid_model, type = "response")
+library(sandwich)
+library(lmtest)
+v <- vcovHC(asian_only_medicaid_model, type = "HC0")
+variances <- diag(v)
+high_variance_indices <- variances > 0.05
+high_variances <- variances[high_variance_indices]
+
+if (length(high_variances) > 0) {
+    print("Variances higher than 0.05:")
+    print(high_variances)
+} else {
+    print("No variances higher than 0.05.")
+}
 ```
 
 Blinder Oxaca
@@ -223,15 +394,23 @@ View(summary(ethnic_oaxaca))
 ```
 
 ```{r}
-summary(ethnic_oaxaca$reg$reg.A)$coefficients
+summary_model <- summary(ethnic_oaxaca$reg$reg.A)
+state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
+summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
+print(summary_model$coefficients)
 ```
 
 ```{r}
-summary(ethnic_oaxaca$reg$reg.B)$coefficients
+summary_model <- summary(ethnic_oaxaca$reg$reg.B)
+state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
+summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
+print(summary_model$coefficients)
 ```
 
 
 ```{r}
+library(ggplot2)
+
 overall_effects <- data.frame(
   Effect = c("Endowments", "Coefficients", "Interaction"),
   Coefficient = c(ethnic_oaxaca$threefold$overall["coef(endowments)"],
@@ -284,11 +463,17 @@ View(summary(migrant_oaxaca))
 ```
 
 ```{r}
-summary(migrant_oaxaca$reg$reg.A)$coefficients
+summary_model <- summary(migrant_oaxaca$reg$reg.A)
+state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
+summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
+print(summary_model$coefficients)
 ```
 
 ```{r}
-summary(migrant_oaxaca$reg$reg.B)$coefficients
+summary_model <- summary(migrant_oaxaca$reg$reg.B)
+state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
+summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
+print(summary_model$coefficients)
 ```
 
 ```{r}
