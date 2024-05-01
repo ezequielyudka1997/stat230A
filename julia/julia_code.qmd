@@ -7,8 +7,10 @@ editor: source
 ```{r, message=FALSE}
 library(tidyverse)
 library(gridExtra)
-library(plm)
+library(MASS)
 ```
+
+# Reading in
 
 ```{r}
 zip_file_path <- "../processed_data.zip"
@@ -28,7 +30,7 @@ processed_data <- processed_data %>%
 processed_data$ENG[is.na(processed_data$ENG)] <- 0
 ```
 
-Data Dictionary:
+# Data Dictionary:
 
 ST: State
 
@@ -199,9 +201,9 @@ Years_naturalized: 2022 - CITWP Asian: ifelse(RAC1P ==6, 1, 0)
 wb50birth: 1: Yes , 0: No/greater than 50 years/ male) 
 
 ```{r}
-#colnames(processed_data)
+colnames(processed_data)
 ```
-
+# Cleaning
 ```{r}
 processed_data$Years_naturalized[processed_data$Foreign_born == 0] <- 0
 processed_data$Years_in_US[processed_data$Foreign_born == 0] <- 0
@@ -217,26 +219,51 @@ processed_data$wb50birth[is.na(processed_data$FER) &
 ```
 
 ```{r}
-processed_data$adj_WAGP = processed_data$WAGP + 1
+processed_data2 = processed_data%>%filter(WAGP>0 & WAGP < 999999)
+processed_data2$adj_WAGP = log(processed_data2$WAGP)
 ```
 
 ```{r}
-a <- ggplot(processed_data,aes(x = WAGP)) + geom_histogram()
-b <- ggplot(processed_data,aes(x = log(adj_WAGP))) + geom_histogram()
-#grid.arrange(a,b, ncol = 2)
+# Using the boxcox function to determine the best lambda
+bc_outcome <- boxcox(WAGP ~ 1, data = processed_data2, lambda = seq(-6, 6, by = 0.1))
+
+# Plotting to visually inspect the best lambda
+plot(bc_outcome)
+
+# Finding the lambda that maximizes the log-likelihood
+best_lambda <- bc_outcome$x[which.max(bc_outcome$y)]
+print(best_lambda)
+```
+
+
+```{r}
+# Applying the Box-Cox transformation
+processed_data2$bc_WAGP <- if(best_lambda != 0) {
+  (processed_data2$WAGP^best_lambda - 1) / best_lambda
+} else {
+  log(processed_data2$WAGP)
+}
 ```
 
 # EDA Visualizations
 
 ```{r}
-wagecit<- ggplot(processed_data, aes(x = WAGP, fill = factor(Citizen), color = factor(Citizen))) +
+a <- ggplot(processed_data2,aes(x = WAGP)) + geom_histogram()
+b <- ggplot(processed_data2,aes(x = adj_WAGP)) + geom_histogram()
+grid.arrange(a,b, ncol = 2)
+```
+
+```{r}
+wagecit<- ggplot(processed_data2, aes(x = WAGP, fill = factor(Citizen), color = factor(Citizen))) +
   geom_density(aes(y = ..density..), alpha = 0.5) +
   labs(title = "Distribution of Wages by Race",
        x = "Wages",
        y = "Density (Proportion)") + theme_minimal()
+wagecit
 ```
+
 ```{r}
-logwagecit<- ggplot(processed_data, aes(x = log(adj_WAGP), fill = factor(Citizen), color = factor(Citizen))) +
+logwagecit<- ggplot(processed_data2, aes(x = adj_WAGP, fill = factor(Citizen), color = factor(Citizen))) +
   geom_density(aes(y = ..density..), alpha = 0.5) +
   labs(title = "Distribution of log(Wages + 1) by Race",
        x = "log(Wages + 1)",
@@ -244,7 +271,7 @@ logwagecit<- ggplot(processed_data, aes(x = log(adj_WAGP), fill = factor(Citizen
 ```
 
 ```{r}
-wagerace<- ggplot(processed_data, aes(x = WAGP, fill = factor(RAC1P), color = factor(RAC1P))) +
+wagerace<- ggplot(processed_data2, aes(x = WAGP, fill = factor(RAC1P), color = factor(RAC1P))) +
   geom_density(aes(y = ..density..), alpha = 0.5) +
   facet_wrap(vars(factor(Citizen))) +
   labs(title = "Distribution of Wages by Race, Faceted by Citizenship Status",
@@ -252,7 +279,7 @@ wagerace<- ggplot(processed_data, aes(x = WAGP, fill = factor(RAC1P), color = fa
        y = "Density (Proportion)") + theme_minimal()
 ```
 ```{r}
-logwagerace<- processed_data%>%filter(RAC1P %in% c(1,2,6))%>%ggplot(aes(x = log(adj_WAGP), fill = factor(RAC1P), color = factor(RAC1P))) +
+logwagerace<- processed_data2%>%filter(RAC1P %in% c(1,2,6))%>%ggplot(aes(x = adj_WAGP, fill = factor(RAC1P), color = factor(RAC1P))) +
   geom_density(aes(y = ..density..), alpha = 0.5) +
   facet_wrap(vars(factor(Citizen))) +
   labs(title = "Distribution of log(Wages + 1) by Race, Faceted by Citizenship Status",
@@ -260,7 +287,7 @@ logwagerace<- processed_data%>%filter(RAC1P %in% c(1,2,6))%>%ggplot(aes(x = log(
        y = "Density (Proportion)") + theme_minimal()
 ```
 ```{r}
-logwage_for<- processed_data%>%filter(RAC1P %in% c(1,2,6,8,9))%>%ggplot(aes(x = log(adj_WAGP))) +
+logwage_for<- processed_data2%>%filter(RAC1P %in% c(1,2,6,8,9))%>%ggplot(aes(x = adj_WAGP)) +
   geom_density(aes(y = ..density.., fill = factor(RAC1P), color = factor(RAC1P)), alpha = 0.5) +
   facet_wrap(vars(factor(Foreign_born))) +
   labs(title = "Distribution of log(Wages + 1) by Race, Faceted by Foreign_born",
@@ -273,11 +300,13 @@ logwage_for<- processed_data%>%filter(RAC1P %in% c(1,2,6,8,9))%>%ggplot(aes(x = 
 ## Predicting Wages in America: 
 
 ```{r}
-processed_data = processed_data%>%mutate(immigrant = CIT%in%c(4,5))
+processed_data2 = processed_data2%>%mutate(immigrant = CIT%in%c(4,5))
 ```
 
+
+### model0 and summary
 ```{r}
-model0 = lm(log(adj_WAGP) ~as.factor(RAC1P) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + HISP_dummy + PAP + HINS4 + immigrant, data = processed_data)
+model0 = lm(adj_WAGP ~as.factor(RAC1P) + AGEP + I(AGEP^2) + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth + as.factor(ST) + High_School_Grad + Bachelors_Degree + HISP_dummy + PAP + HINS4 + immigrant, data = processed_data2)
 ```
 
 ```{r}
@@ -291,17 +320,77 @@ summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
 # Print the refined summary
 summary_model
 ```
+### qqplot
+```{r}
+residuals_df <- data.frame(residuals = resid(model0))
+ggplot(residuals_df, aes(sample = residuals)) +
+  stat_qq() +
+  stat_qq_line(color = "red") +
+  ggtitle("Normal Q-Q Plot of Residuals") +
+  xlab("Theoretical Quantiles") +
+  ylab("Sample Quantiles") +
+  theme_minimal() +
+  theme(aspect.ratio = 1)
+```
+
+
+```{r}
+qqnorm(resid(model0))
+qqline(resid(model0))
+```
+### resid plot
+
+```{r}
+# produce residual vs. fitted plot 
+plot(fitted(model0), resid(model0)) 
+  
+# add a horizontal line at 0  
+abline(0,0) 
+```
+
+### model0.1 and summary
+
+```{r}
+model0.1 = lm(bc_WAGP ~as.factor(RAC1P) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + HISP_dummy + PAP + HINS4 + immigrant, data = processed_data2)
+```
+
+```{r}
+# Get the summary of the model
+summary_model <- summary(model0.1)
+
+# Filter out rows related to state coefficients
+state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
+summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
+
+# Print the refined summary
+summary_model
+```
+### qqplot
+```{r}
+qqnorm(resid(model0.1))
+qqline(resid(model0.1))
+```
+### resid plot
+
+```{r}
+# produce residual vs. fitted plot 
+plot(fitted(model0.1), resid(model0.1)) 
+  
+# add a horizontal line at 0  
+abline(0,0) 
+```
+
 
 ## Predicting Immigrants Wages: Differences across Wages for immigrants of different Races
 
 
 ```{r}
-immigrants_only = processed_data%>%filter(CIT%in% c(4,5))
+immigrants_only = processed_data2%>%filter(CIT%in% c(4,5))
 immigrants_only2 = immigrants_only%>%filter(RAC1P%in%c(1,2,6,8,9))
 ```
-
+### model and summary
 ```{r}
-model1 = lm(log(adj_WAGP) ~ as.factor(RAC1P) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + HISP_dummy + as.factor(MAR) + PAP + HINS4, data = immigrants_only2)
+model1 = lm(adj_WAGP ~ as.factor(RAC1P) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + HISP_dummy + as.factor(MAR) + PAP + HINS4, data = immigrants_only2)
 ```
 
 ```{r}
@@ -315,16 +404,21 @@ summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
 # Print the refined summary
 summary_model
 ```
+### qqplot
+
+
 ```{r}
-#qqnorm(residuals(model1))
-#qqline(residuals(model1))
+qqnorm(resid(model1))
+qqline(resid(model1))
 ```
 
 
 ## Predicting Wages for Asian: Differences across Wages for Asian immigrants and from top 5 countries and also non-immigrants
 
+
+### selecting new data for asians
 ```{r}
-asian_only = processed_data%>%filter(Asian==1)
+asian_only = processed_data2%>%filter(Asian==1)
 asian_only_im = immigrants_only2%>%filter(Asian==1)
 ```
 ```{r}
@@ -338,29 +432,31 @@ largest_subgroup = asian_only_im%>%group_by(POBP)%>%
 asian_only_im = asian_only_im%>%filter(POBP %in% largest_subgroup)
 ```
 
+### plots for asians
+
 ```{r}
 # Create density plot for RAC1P groups
-density_plot_rac1p <- ggplot(immigrants_only2 %>% filter(RAC1P %in% c(1, 2, 6)), aes(x = log(adj_WAGP), fill = factor(RAC1P), color = factor(RAC1P))) +
+density_plot_rac1p <- ggplot(immigrants_only2 %>% filter(RAC1P %in% c(1, 2, 6)), aes(x = adj_WAGP, fill = factor(RAC1P), color = factor(RAC1P))) +
   geom_density(aes(y = ..density..), alpha = 0.5) +
   labs(title = "Distribution of Immigrant Wages by Race",
        x = "Wages",
        y = "Density (Proportion)") + ylim(0,0.6)
 
 # Create density plot for RAC1P groups
-density_plot_rac1p2 <- ggplot(processed_data %>% filter(RAC1P %in% c(1, 2, 6) & immigrant ==0), aes(x = log(adj_WAGP), fill = factor(RAC1P), color = factor(RAC1P))) +
+density_plot_rac1p2 <- ggplot(processed_data2 %>% filter(RAC1P %in% c(1, 2, 6) & immigrant ==0), aes(x = adj_WAGP, fill = factor(RAC1P), color = factor(RAC1P))) +
   geom_density(aes(y = ..density..), alpha = 0.5) +
   labs(title = "Distribution of non-Immigrant Wages by Race",
        x = "Wages",
        y = "Density (Proportion)") + ylim(0,0.6)
 
 # Create density plot for Asian immigrants
-density_plot_asian <- ggplot(asian_only_im, aes(x = log(adj_WAGP), fill = factor(POBP), color = factor(POBP))) +
+density_plot_asian <- ggplot(asian_only_im, aes(x = adj_WAGP, fill = factor(POBP), color = factor(POBP))) +
   geom_density(aes(y = ..density..), alpha = 0.5) +
   labs(title = "Distribution of Immigrant Wages for Asians by Country of Origin",
        x = "Wages",
        y = "Density (Proportion)")+ ylim(0,0.6)
 
-density_plot_asian2 <- ggplot(asian_only, aes(x = log(adj_WAGP))) +
+density_plot_asian2 <- ggplot(asian_only, aes(x = adj_WAGP)) +
   geom_density(aes(y = ..density..), alpha = 0.5, alpha = 0.5, fill = "cornflowerblue", color = "cornflowerblue") +
   labs(title = "Distribution of non-Immigrants Wages for Asians",
        x = "Wages",
@@ -372,9 +468,10 @@ grid.arrange(density_plot_rac1p, density_plot_rac1p2, density_plot_asian, densit
 
 ```
 
+### model 1 for asian immigrants
 
 ```{r}
-model2 = lm(log(adj_WAGP) ~ AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + HISP_dummy + PAP + HINS4 + as.factor(MAR) , data = asian_only_im)
+model2 = lm(adj_WAGP ~ AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + HISP_dummy + PAP + HINS4 + as.factor(MAR) , data = asian_only_im)
 ```
 
 ```{r}
@@ -388,9 +485,15 @@ summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
 # Print the refined summary
 summary_model
 ```
+### qqplot1
+```{r}
+qqnorm(resid(model2))
+qqline(resid(model2))
+```
+### model 2 for all asians
 
 ```{r}
-model2.1 = lm(log(adj_WAGP) ~ AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + HISP_dummy + PAP + HINS4 + immigrant + as.factor(MAR) , data = asian_only)
+model2.1 = lm(adj_WAGP ~ AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth + Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + HISP_dummy + PAP + HINS4 + immigrant + as.factor(MAR) , data = asian_only)
 ```
 
 ```{r}
@@ -405,11 +508,19 @@ summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
 summary_model
 ```
 
+### qqplot2
+```{r}
+qqnorm(resid(model2.1))
+qqline(resid(model2.1))
+```
+
+
 
 ## Predicting Immigrants Wages: Differences across Wages for Hispanic immigrants from top 5 countries and also non-immigrants
 
+### HISP data cleaning
 ```{r}
-hisp_only = processed_data%>%filter(HISP_dummy==1)
+hisp_only = processed_data2%>%filter(HISP_dummy==1)
 hisp_only_im = immigrants_only2%>%filter(HISP_dummy==1)
 ```
 ```{r}
@@ -423,35 +534,37 @@ largest_subgroup = hisp_only_im%>%group_by(POBP)%>%
 hisp_only_im = hisp_only_im%>%filter(POBP %in% largest_subgroup)
 ```
 
+### HISP EDA
+
 ```{r}
 # Create density plot for RAC1P groups
-density_plot_rac1p <- ggplot(hisp_only_im, aes(x = log(adj_WAGP), fill = factor(RAC1P), color = factor(RAC1P))) +
+density_plot_rac1p <- ggplot(hisp_only_im, aes(x = adj_WAGP, fill = factor(RAC1P), color = factor(RAC1P))) +
   geom_density(aes(y = ..density..), alpha = 0.5) +
   labs(title = "Distribution of Hispanic Immigrant Wages by Race",
        x = "Wages",
        y = "Density (Proportion)") + ylim(0,0.6)
 
 # Create density plot for RAC1P groups
-density_plot_rac1p2 <- ggplot(hisp_only %>% filter(immigrant ==0), aes(x = log(adj_WAGP), fill = factor(RAC1P), color = factor(RAC1P))) +
+density_plot_rac1p2 <- ggplot(hisp_only %>% filter(immigrant ==0), aes(x = adj_WAGP, fill = factor(RAC1P), color = factor(RAC1P))) +
   geom_density(aes(y = ..density..), alpha = 0.5) +
   labs(title = "Distribution of non-Immigrant Hispanic Wages by Race",
        x = "Wages",
        y = "Density (Proportion)") + ylim(0,0.6)
 
 # Create density plot for Hispanic immigrants
-density_plot_hisp <- ggplot(hisp_only_im, aes(x = log(adj_WAGP), fill = factor(POBP), color = factor(POBP))) +
+density_plot_hisp <- ggplot(hisp_only_im, aes(x = adj_WAGP, fill = factor(POBP), color = factor(POBP))) +
   geom_density(aes(y = ..density..), alpha = 0.5) +
   labs(title = "Distribution of Immigrant Wages for Hispanics by Country of Origin",
        x = "Wages",
        y = "Density (Proportion)")+ ylim(0,0.6)
 
-density_plot_hisp2 <- ggplot(hisp_only%>% filter(immigrant ==0), aes(x = log(adj_WAGP))) +
+density_plot_hisp2 <- ggplot(hisp_only%>% filter(immigrant ==0), aes(x = adj_WAGP)) +
   geom_density(aes(y = ..density..), alpha = 0.5, alpha = 0.5, fill = "cornflowerblue", color = "cornflowerblue") +
   labs(title = "Distribution of non-Immigrant Wages for Hispanics",
        x = "Wages",
        y = "Density (Proportion)")+ ylim(0,0.6)
 
-density_plot_hisp3 <- ggplot(hisp_only_im, aes(x = log(adj_WAGP))) +
+density_plot_hisp3 <- ggplot(hisp_only_im, aes(x = adj_WAGP)) +
   geom_density(aes(y = ..density..), alpha = 0.5, alpha = 0.5, fill = "cornflowerblue", color = "cornflowerblue") +
   labs(title = "Distribution of Immigrant Wages for Hispanics",
        x = "Wages",
@@ -462,8 +575,10 @@ library(gridExtra)
 grid.arrange(density_plot_rac1p, density_plot_rac1p2, density_plot_hisp, density_plot_hisp2,density_plot_hisp3, ncol = 2, nrow = 3)
 ```
 
+### HISP model 1 for immigrants
+
 ```{r}
-model3 = lm(log(adj_WAGP) ~ as.factor(RAC1P) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + PAP + HINS4 + as.factor(MAR), data = hisp_only_im)
+model3 = lm(adj_WAGP ~ as.factor(RAC1P) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + PAP + HINS4 + as.factor(MAR), data = hisp_only_im)
 ```
 
 ```{r}
@@ -478,9 +593,16 @@ summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
 summary_model
 ```
 
+### qqplot 1
+```{r}
+qqnorm(resid(model3))
+qqline(resid(model3))
+```
+
+### HISP model 2 for all hispanics
 
 ```{r}
-model3.1 = lm(log(adj_WAGP) ~ as.factor(RAC1P) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + PAP + HINS4 + immigrant + as.factor(MAR), data = hisp_only)
+model3.1 = lm(adj_WAGP ~ as.factor(RAC1P) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + PAP + HINS4 + immigrant + as.factor(MAR), data = hisp_only)
 ```
 
 ```{r}
@@ -494,6 +616,11 @@ summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
 # Print the refined summary
 summary_model
 ```
+### qqplot2
 
+```{r}
+qqnorm(resid(model3.1))
+qqline(resid(model3.1))
+```
 
 
