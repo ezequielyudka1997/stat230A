@@ -79,9 +79,6 @@ processed_data$adj_WAGP = processed_data$WAGP + 1
 processed_data = processed_data%>%mutate(immigrant = CIT%in%c(4,5))
 ```
 
-as.factor(RAC1P) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + HISP_dummy + as.factor(MAR) + PAP + HINS4
-
-
 Logistics regression: Predict Employment status
 ```{r}
 employment_status_model <- glm(Unemployed ~  as.factor(RAC1P) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth + as.factor(ST) + High_School_Grad + Bachelors_Degree + HISP_dummy, data = processed_data, family = binomial())
@@ -100,15 +97,13 @@ library(sandwich)
 library(lmtest)
 v <- vcovHC(employment_status_model, type = "HC0")
 variances <- diag(v)
-high_variance_indices <- variances > 0.05
-high_variances <- variances[high_variance_indices]
-
-if (length(high_variances) > 0) {
-    print("Variances higher than 0.05:")
-    print(high_variances)
-} else {
-    print("No variances higher than 0.05.")
-}
+std_errors <- sqrt(diag(v))
+conf_intervals <- sweep(exp(coef(employment_status_model) + qnorm(c(0.025, 0.975)) %o% std_errors), 2, exp(coef(employment_status_model)), "*")
+print(conf_intervals)
+results <- data.frame(Coefficients = exp(coef(employment_status_model)), Lower = conf_intervals[1,], Upper = conf_intervals[2,])
+non_state_vars <- !grepl("as\\.factor\\(ST\\)\\d+", rownames(results))
+filtered_results <- results[non_state_vars, ]
+print(filtered_results)
 ```
 
 Logistics regression: Risk of poverty
@@ -128,16 +123,13 @@ residuals <- residuals(poverty_risk_model, type = "response")
 library(sandwich)
 library(lmtest)
 v <- vcovHC(poverty_risk_model, type = "HC0")
-variances <- diag(v)
-high_variance_indices <- variances > 0.05
-high_variances <- variances[high_variance_indices]
-
-if (length(high_variances) > 0) {
-    print("Variances higher than 0.05:")
-    print(high_variances)
-} else {
-    print("No variances higher than 0.05.")
-}
+std_errors <- sqrt(diag(v))
+conf_intervals <- sweep(exp(coef(poverty_risk_model) + qnorm(c(0.025, 0.975)) %o% std_errors), 2, exp(coef(poverty_risk_model)), "*")
+print(conf_intervals)
+results <- data.frame(Coefficients = exp(coef(poverty_risk_model)), Lower = conf_intervals[1,], Upper = conf_intervals[2,])
+non_state_vars <- !grepl("as\\.factor\\(ST\\)\\d+", rownames(results))
+filtered_results <- results[non_state_vars, ]
+print(filtered_results)
 ```
 Logistics regression: Probability of being on medicaid (HINS4)
 ```{r}
@@ -156,15 +148,13 @@ library(sandwich)
 library(lmtest)
 v <- vcovHC(medicaid_model, type = "HC0")
 variances <- diag(v)
-high_variance_indices <- variances > 0.05
-high_variances <- variances[high_variance_indices]
-
-if (length(high_variances) > 0) {
-    print("Variances higher than 0.05:")
-    print(high_variances)
-} else {
-    print("No variances higher than 0.05.")
-}
+std_errors <- sqrt(diag(v))
+conf_intervals <- sweep(exp(coef(medicaid_model) + qnorm(c(0.025, 0.975)) %o% std_errors), 2, exp(coef(medicaid_model)), "*")
+print(conf_intervals)
+results <- data.frame(Coefficients = exp(coef(medicaid_model)), Lower = conf_intervals[1,], Upper = conf_intervals[2,])
+non_state_vars <- !grepl("as\\.factor\\(ST\\)\\d+", rownames(results))
+filtered_results <- results[non_state_vars, ]
+print(filtered_results)
 ```
 
 ```{r}
@@ -212,15 +202,19 @@ library(sandwich)
 library(lmtest)
 v <- vcovHC(hisp_only_employment_status_model, type = "HC0")
 variances <- diag(v)
-high_variance_indices <- variances > 0.05
-high_variances <- variances[high_variance_indices]
-
-if (length(high_variances) > 0) {
-    print("Variances higher than 0.05:")
-    print(high_variances)
-} else {
-    print("No variances higher than 0.05.")
-}
+std_errors <- sqrt(diag(v))
+coefficients <- coef(hisp_only_employment_status_model)
+exp_coefficients <- exp(coefficients)
+lower_bound <- exp_coefficients * exp(-1.96 * std_errors)
+upper_bound <- exp_coefficients * exp(1.96 * std_errors)
+results <- data.frame(
+  Coefficients = exp_coefficients,
+  Lower_CI = lower_bound,
+  Upper_CI = upper_bound
+)
+state_var_pattern <- "^as\\.factor\\(ST\\)"
+results <- results[!grepl(state_var_pattern, rownames(results)), ]
+print(results)
 ```
 
 ```{r}
@@ -240,15 +234,19 @@ library(sandwich)
 library(lmtest)
 v <- vcovHC(hisp_only_poverty_risk_model, type = "HC0")
 variances <- diag(v)
-high_variance_indices <- variances > 0.05
-high_variances <- variances[high_variance_indices]
-
-if (length(high_variances) > 0) {
-    print("Variances higher than 0.05:")
-    print(high_variances)
-} else {
-    print("No variances higher than 0.05.")
-}
+std_errors <- sqrt(diag(v))
+coefficients <- coef(hisp_only_poverty_risk_model)
+exp_coefficients <- exp(coefficients)
+lower_bound <- exp_coefficients * exp(-1.96 * std_errors)
+upper_bound <- exp_coefficients * exp(1.96 * std_errors)
+results <- data.frame(
+  Coefficients = exp_coefficients,
+  Lower_CI = lower_bound,
+  Upper_CI = upper_bound
+)
+state_var_pattern <- "^as\\.factor\\(ST\\)"
+results <- results[!grepl(state_var_pattern, rownames(results)), ]
+print(results)
 ```
 
 ```{r}
@@ -267,15 +265,19 @@ library(sandwich)
 library(lmtest)
 v <- vcovHC(hisp_only_medicaid_model, type = "HC0")
 variances <- diag(v)
-high_variance_indices <- variances > 0.05
-high_variances <- variances[high_variance_indices]
-
-if (length(high_variances) > 0) {
-    print("Variances higher than 0.05:")
-    print(high_variances)
-} else {
-    print("No variances higher than 0.05.")
-}
+std_errors <- sqrt(diag(v))
+coefficients <- coef(hisp_only_medicaid_model)
+exp_coefficients <- exp(coefficients)
+lower_bound <- exp_coefficients * exp(-1.96 * std_errors)
+upper_bound <- exp_coefficients * exp(1.96 * std_errors)
+results <- data.frame(
+  Coefficients = exp_coefficients,
+  Lower_CI = lower_bound,
+  Upper_CI = upper_bound
+)
+state_var_pattern <- "^as\\.factor\\(ST\\)"
+results <- results[!grepl(state_var_pattern, rownames(results)), ]
+print(results)
 ```
 
 Repeat the exercise for top Asian origins
@@ -307,15 +309,19 @@ library(sandwich)
 library(lmtest)
 v <- vcovHC(asian_only_employment_status_model, type = "HC0")
 variances <- diag(v)
-high_variance_indices <- variances > 0.05
-high_variances <- variances[high_variance_indices]
-
-if (length(high_variances) > 0) {
-    print("Variances higher than 0.05:")
-    print(high_variances)
-} else {
-    print("No variances higher than 0.05.")
-}
+std_errors <- sqrt(diag(v))
+coefficients <- coef(asian_only_employment_status_model)
+exp_coefficients <- exp(coefficients)
+lower_bound <- exp_coefficients * exp(-1.96 * std_errors)
+upper_bound <- exp_coefficients * exp(1.96 * std_errors)
+results <- data.frame(
+  Coefficients = exp_coefficients,
+  Lower_CI = lower_bound,
+  Upper_CI = upper_bound
+)
+state_var_pattern <- "^as\\.factor\\(ST\\)"
+results <- results[!grepl(state_var_pattern, rownames(results)), ]
+print(results)
 ```
 
 ```{r}
@@ -333,15 +339,19 @@ library(sandwich)
 library(lmtest)
 v <- vcovHC(asian_only_poverty_risk_model, type = "HC0")
 variances <- diag(v)
-high_variance_indices <- variances > 0.05
-high_variances <- variances[high_variance_indices]
-
-if (length(high_variances) > 0) {
-    print("Variances higher than 0.05:")
-    print(high_variances)
-} else {
-    print("No variances higher than 0.05.")
-}
+std_errors <- sqrt(diag(v))
+coefficients <- coef(asian_only_poverty_risk_model)
+exp_coefficients <- exp(coefficients)
+lower_bound <- exp_coefficients * exp(-1.96 * std_errors)
+upper_bound <- exp_coefficients * exp(1.96 * std_errors)
+results <- data.frame(
+  Coefficients = exp_coefficients,
+  Lower_CI = lower_bound,
+  Upper_CI = upper_bound
+)
+state_var_pattern <- "^as\\.factor\\(ST\\)"
+results <- results[!grepl(state_var_pattern, rownames(results)), ]
+print(results)
 ```
 
 ```{r}
@@ -359,15 +369,19 @@ library(sandwich)
 library(lmtest)
 v <- vcovHC(asian_only_medicaid_model, type = "HC0")
 variances <- diag(v)
-high_variance_indices <- variances > 0.05
-high_variances <- variances[high_variance_indices]
-
-if (length(high_variances) > 0) {
-    print("Variances higher than 0.05:")
-    print(high_variances)
-} else {
-    print("No variances higher than 0.05.")
-}
+std_errors <- sqrt(diag(v))
+coefficients <- coef(asian_only_poverty_risk_model)
+exp_coefficients <- exp(coefficients)
+lower_bound <- exp_coefficients * exp(-1.96 * std_errors)
+upper_bound <- exp_coefficients * exp(1.96 * std_errors)
+results <- data.frame(
+  Coefficients = exp_coefficients,
+  Lower_CI = lower_bound,
+  Upper_CI = upper_bound
+)
+state_var_pattern <- "^as\\.factor\\(ST\\)"
+results <- results[!grepl(state_var_pattern, rownames(results)), ]
+print(results)
 ```
 
 Blinder Oxaca
