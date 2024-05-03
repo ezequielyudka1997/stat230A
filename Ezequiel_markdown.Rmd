@@ -80,9 +80,9 @@ processed_data = processed_data%>%mutate(immigrant = CIT%in%c(4,5))
 ```
 
 Logistics regression: Predict Employment status
+
 ```{r}
-employment_status_model <- glm(Unemployed ~  as.factor(RAC1P) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth + as.factor(ST) + High_School_Grad + Bachelors_Degree + HISP_dummy, data = processed_data, family = binomial())
-#summary(employment_status_model)
+employment_status_model <- glm(Unemployed ~  as.factor(RAC1P) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth + as.factor(ST) + High_School_Grad + Bachelors_Degree + HISP_dummy + as.factor(MAR) , data = processed_data, family = binomial())
 
 summary_model <- summary(employment_status_model)
 state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
@@ -105,6 +105,18 @@ non_state_vars <- !grepl("as\\.factor\\(ST\\)\\d+", rownames(results))
 filtered_results <- results[non_state_vars, ]
 print(filtered_results)
 ```
+```{r}
+filtered_results$Variable <- rownames(filtered_results)
+ggplot(filtered_results, aes(x = Variable, y = Coefficients)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = Lower, ymax = Upper), width = 0.2) +
+  coord_flip() +
+  labs(title = "Coefficient plot with Confidence Intervals",
+       x = "Variable",
+       y = "Exponential Coefficients") +
+  theme_minimal()
+print(ggplot)
+```
 
 Logistics regression: Risk of poverty
 ```{r}
@@ -117,6 +129,7 @@ state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients)
 summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
 summary_model
 ```
+
 ```{r}
 fitted_probs <- fitted(poverty_risk_model)
 residuals <- residuals(poverty_risk_model, type = "response")
@@ -131,6 +144,20 @@ non_state_vars <- !grepl("as\\.factor\\(ST\\)\\d+", rownames(results))
 filtered_results <- results[non_state_vars, ]
 print(filtered_results)
 ```
+
+```{r}
+filtered_results$Variable <- rownames(filtered_results)
+ggplot(filtered_results, aes(x = Variable, y = Coefficients)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = Lower, ymax = Upper), width = 0.2) +
+  coord_flip() +
+  labs(title = "Coefficient Plot with Confidence Intervals",
+       x = "Variable",
+       y = "Exponential Coefficients") +
+  theme_minimal()
+print(ggplot)
+```
+
 Logistics regression: Probability of being on medicaid (HINS4)
 ```{r}
 medicaid_model <- glm(HINS4 ~ as.factor(RAC1P) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + HISP_dummy + as.factor(MAR), family = binomial(), data = processed_data)
@@ -141,6 +168,7 @@ state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients)
 summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
 summary_model
 ```
+
 ```{r}
 fitted_probs <- fitted(medicaid_model)
 residuals <- residuals(medicaid_model, type = "response")
@@ -155,6 +183,19 @@ results <- data.frame(Coefficients = exp(coef(medicaid_model)), Lower = conf_int
 non_state_vars <- !grepl("as\\.factor\\(ST\\)\\d+", rownames(results))
 filtered_results <- results[non_state_vars, ]
 print(filtered_results)
+```
+
+```{r}
+filtered_results$Variable <- rownames(filtered_results)
+ggplot(filtered_results, aes(x = Variable, y = Coefficients)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = Lower, ymax = Upper), width = 0.2) +
+  coord_flip() +
+  labs(title = "Coefficient Plot with Confidence Intervals",
+       x = "Variable",
+       y = "Exponential Coefficients") +
+  theme_minimal()
+print(ggplot)
 ```
 
 ```{r}
@@ -177,7 +218,7 @@ hisp_only = processed_data%>%filter(HISP_dummy==1)
 hisp_only_im = immigrants_only2%>%filter(HISP_dummy==1)
 
 largest_subgroup = hisp_only_im%>%group_by(POBP)%>%
-  summarise(count = n())%>%
+  summarise(count = n())%>%largest_subgroup
   mutate(per = (count/sum(count))*100)%>%
   arrange(desc(per))%>%head(5)%>%pull(POBP)
 
@@ -186,7 +227,7 @@ hisp_only_im = hisp_only_im%>%filter(POBP %in% largest_subgroup)
 
 Hispanic immigrants
 ```{r}
-hisp_only_employment_status_model <- glm(Unemployed ~  as.factor(POBP) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth + as.factor(ST) + High_School_Grad + Bachelors_Degree + PAP + HINS4 + immigrant, data = hisp_only_im, family = binomial())
+hisp_only_employment_status_model <- glm(Unemployed ~  as.factor(POBP) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth + as.factor(ST) + High_School_Grad + Bachelors_Degree + as.factor(MAR), data = hisp_only_im, family = binomial())
 #summary(hisp_only_employment_status_model)
 
 summary_model <- summary(hisp_only_employment_status_model)
@@ -195,6 +236,7 @@ filtered_coefficients <- summary_model$coefficients[!state_rows, ]
 summary_model$coefficients <- filtered_coefficients
 print(summary_model$coefficients)
 ```
+
 ```{r}
 fitted_probs <- fitted(hisp_only_employment_status_model)
 residuals <- residuals(hisp_only_employment_status_model, type = "response")
@@ -216,9 +258,21 @@ state_var_pattern <- "^as\\.factor\\(ST\\)"
 results <- results[!grepl(state_var_pattern, rownames(results)), ]
 print(results)
 ```
+```{r}
+filtered_results$Variable <- rownames(filtered_results)
+ggplot(filtered_results, aes(x = Variable, y = Coefficients)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = Lower, ymax = Upper), width = 0.2) +
+  coord_flip() +
+  labs(title = "Coefficient Plot with Confidence Intervals",
+       x = "Variable",
+       y = "Exponential Coefficients") +
+  theme_minimal()
+print(ggplot)
+```
 
 ```{r}
-hisp_only_poverty_risk_model <- glm(PAP_binary ~ as.factor(POBP) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + as.factor(MAR) + immigrant, family = binomial(), data = hisp_only_im)
+hisp_only_poverty_risk_model <- glm(PAP_binary ~ as.factor(POBP) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + as.factor(MAR), family = binomial(), data = hisp_only_im)
 #summary(hisp_only_poverty_risk_model)
 
 summary_model <- summary(hisp_only_poverty_risk_model)
@@ -227,6 +281,7 @@ filtered_coefficients <- summary_model$coefficients[!state_rows, ]
 summary_model$coefficients <- filtered_coefficients
 print(summary_model$coefficients)
 ```
+
 ```{r}
 fitted_probs <- fitted(hisp_only_poverty_risk_model)
 residuals <- residuals(hisp_only_poverty_risk_model, type = "response")
@@ -248,9 +303,21 @@ state_var_pattern <- "^as\\.factor\\(ST\\)"
 results <- results[!grepl(state_var_pattern, rownames(results)), ]
 print(results)
 ```
+```{r}
+filtered_results$Variable <- rownames(filtered_results)
+ggplot(filtered_results, aes(x = Variable, y = Coefficients)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = Lower, ymax = Upper), width = 0.2) +
+  coord_flip() +
+  labs(title = "Coefficient Plot with Confidence Intervals",
+       x = "Variable",
+       y = "Exponential Coefficients") +
+  theme_minimal()
+print(ggplot)
+```
 
 ```{r}
-hisp_only_medicaid_model <- glm(HINS4 ~ as.factor(POBP) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + as.factor(MAR) + immigrant, family = binomial(), data = hisp_only_im)
+hisp_only_medicaid_model <- glm(HINS4 ~ as.factor(POBP) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + as.factor(MAR), family = binomial(), data = hisp_only_im)
 #summary(hisp_only_medicaid_model)
 summary_model <- summary(hisp_only_medicaid_model)
 state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
@@ -258,6 +325,7 @@ filtered_coefficients <- summary_model$coefficients[!state_rows, ]
 summary_model$coefficients <- filtered_coefficients
 print(summary_model$coefficients)
 ```
+
 ```{r}
 fitted_probs <- fitted(hisp_only_medicaid_model)
 residuals <- residuals(hisp_only_medicaid_model, type = "response")
@@ -280,6 +348,19 @@ results <- results[!grepl(state_var_pattern, rownames(results)), ]
 print(results)
 ```
 
+```{r}
+filtered_results$Variable <- rownames(filtered_results)
+ggplot(filtered_results, aes(x = Variable, y = Coefficients)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = Lower, ymax = Upper), width = 0.2) +
+  coord_flip() +
+  labs(title = "Coefficient Plot with Confidence Intervals",
+       x = "Variable",
+       y = "Exponential Coefficients") +
+  theme_minimal()
+print(ggplot)
+```
+
 Repeat the exercise for top Asian origins
 ```{r}
 asian_only = processed_data%>%filter(Asian==1)
@@ -294,7 +375,7 @@ asian_only_im = asian_only_im%>%filter(POBP %in% largest_subgroup)
 ```
 
 ```{r}
-asian_only_employment_status_model <- glm(Unemployed ~  as.factor(POBP) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth + as.factor(ST) + High_School_Grad + Bachelors_Degree + PAP + HINS4 + immigrant, data = asian_only_im, family = binomial())
+asian_only_employment_status_model <- glm(Unemployed ~  as.factor(POBP) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth + as.factor(ST) + High_School_Grad + Bachelors_Degree + as.factor(MAR), data = asian_only_im, family = binomial())
 #summary_model <- summary(asian_only_employment_status_model)
 summary_model <- summary(asian_only_employment_status_model)
 state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
@@ -323,15 +404,28 @@ state_var_pattern <- "^as\\.factor\\(ST\\)"
 results <- results[!grepl(state_var_pattern, rownames(results)), ]
 print(results)
 ```
+```{r}
+filtered_results$Variable <- rownames(filtered_results)
+ggplot(filtered_results, aes(x = Variable, y = Coefficients)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = Lower, ymax = Upper), width = 0.2) +
+  coord_flip() +
+  labs(title = "Coefficient Plot with Confidence Intervals",
+       x = "Variable",
+       y = "Exponential Coefficients") +
+  theme_minimal()
+print(ggplot)
+```
 
 ```{r}
-asian_only_poverty_risk_model <- glm(PAP_binary ~ as.factor(POBP) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + as.factor(MAR) + immigrant, family = binomial(), data = asian_only_im)
+asian_only_poverty_risk_model <- glm(PAP_binary ~ as.factor(POBP) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + as.factor(MAR), family = binomial(), data = asian_only_im)
 summary_model <- summary(asian_only_poverty_risk_model)
 state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
 filtered_coefficients <- summary_model$coefficients[!state_rows, ]
 summary_model$coefficients <- filtered_coefficients
 print(summary_model$coefficients)
 ```
+
 ```{r}
 fitted_probs <- fitted(asian_only_poverty_risk_model)
 residuals <- residuals(asian_only_poverty_risk_model, type = "response")
@@ -353,15 +447,28 @@ state_var_pattern <- "^as\\.factor\\(ST\\)"
 results <- results[!grepl(state_var_pattern, rownames(results)), ]
 print(results)
 ```
+```{r}
+filtered_results$Variable <- rownames(filtered_results)
+ggplot(filtered_results, aes(x = Variable, y = Coefficients)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = Lower, ymax = Upper), width = 0.2) +
+  coord_flip() +
+  labs(title = "Coefficient Plot with Confidence Intervals",
+       x = "Variable",
+       y = "Exponential Coefficients") +
+  theme_minimal()
+print(ggplot)
+```
 
 ```{r}
-asian_only_medicaid_model <- glm(HINS4 ~ as.factor(POBP) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + as.factor(MAR) + immigrant, family = binomial(), data = hisp_only_im)
+asian_only_medicaid_model <- glm(HINS4 ~ as.factor(POBP) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + as.factor(MAR), family = binomial(), data = hisp_only_im)
 summary_model <- summary(asian_only_medicaid_model)
 state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
 filtered_coefficients <- summary_model$coefficients[!state_rows, ]
 summary_model$coefficients <- filtered_coefficients
 print(summary_model$coefficients)
 ```
+
 ```{r}
 fitted_probs <- fitted(asian_only_medicaid_model)
 residuals <- residuals(asian_only_medicaid_model, type = "response")
@@ -382,6 +489,18 @@ results <- data.frame(
 state_var_pattern <- "^as\\.factor\\(ST\\)"
 results <- results[!grepl(state_var_pattern, rownames(results)), ]
 print(results)
+```
+```{r}
+filtered_results$Variable <- rownames(filtered_results)
+ggplot(filtered_results, aes(x = Variable, y = Coefficients)) +
+  geom_point() +
+  geom_errorbar(aes(ymin = Lower, ymax = Upper), width = 0.2) +
+  coord_flip() +
+  labs(title = "Coefficient Plot with Confidence Intervals",
+       x = "Variable",
+       y = "Exponential Coefficients") +
+  theme_minimal()
+print(ggplot)
 ```
 
 Blinder Oxaca
@@ -454,7 +573,7 @@ ggplot(filtered_variable_effects, aes(x = Variable, y = Endowments, fill = "Endo
   geom_col(color = "black", position = position_dodge(width = 0.9)) +
   geom_errorbar(aes(ymin = Endowments - Endowments_SE, ymax = Endowments + Endowments_SE), width = 0.2, position = position_dodge(width = 0.9)) +
   labs(title = "Endowment Effects for Selected Variables", x = NULL, y = "Endowment Effect") +
-  scale_fill_manual(values = c("Endowments" = "blue")) +
+  scale_fill_manual(values = c("Endowments" = "white")) +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
@@ -462,17 +581,50 @@ ggplot(filtered_variable_effects, aes(x = Variable, y = Coefficients, fill = "Co
   geom_col(color = "black", position = position_dodge(width = 0.9)) +
   geom_errorbar(aes(ymin = Coefficients - Coefficients_SE, ymax = Coefficients + Coefficients_SE), width = 0.2, position = position_dodge(width = 0.9)) +
   labs(title = "Coefficient Effects for Selected Variables", x = NULL, y = "Coefficient Effect") +
-  scale_fill_manual(values = c("Coefficients" = "red")) +
+  scale_fill_manual(values = c("Coefficients" = "white")) +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
+```{r}
+coefficients_A <- summary(ethnic_oaxaca$reg$reg.A)$coefficients
+coefficients_A <- coefficients_A[!grepl("^as\\.factor\\(ST\\)|\\(Intercept\\)", rownames(coefficients_A)), ]
+coefficients_A_df <- data.frame(
+  Variable = rownames(coefficients_A),
+  Coefficient = coefficients_A[, "Estimate"],
+  StdError = coefficients_A[, "Std. Error"],
+  Model = "Regression A"
+)
+
+coefficients_B <- summary(ethnic_oaxaca$reg$reg.B)$coefficients
+coefficients_B <- coefficients_B[!grepl("^as\\.factor\\(ST\\)|\\(Intercept\\)", rownames(coefficients_B)), ]
+coefficients_B_df <- data.frame(
+  Variable = rownames(coefficients_B),
+  Coefficient = coefficients_B[, "Estimate"],
+  StdError = coefficients_B[, "Std. Error"],
+  Model = "Regression B"
+)
+
+all_coefficients <- rbind(coefficients_A_df, coefficients_B_df)
+
+ggplot(all_coefficients, aes(x = Variable, y = Coefficient, fill = Model)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.8), width = 0.7) +
+  geom_errorbar(aes(ymin = Coefficient - StdError, ymax = Coefficient + StdError), 
+                position = position_dodge(width = 0.8), width = 0.25) +
+  coord_flip() +
+  scale_fill_manual(values = c("grey70", "grey30")) +
+  labs(title = "Comparison of Coefficients: Regression A vs. B",
+       x = "Variables",
+       y = "Coefficients") +
+  theme_minimal() +
+  theme(legend.position = "top")
+```
+
 Migrant Blinder Oxaca
 ```{r}
 migrant_oaxaca <- oaxaca(
   formula = log(adj_WAGP) ~  AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + as.factor(MAR) + PAP + HINS4 | Foreign_born,
   data = oaxaca_data
 )
-#+ SEX*Citizen, as.factor(RAC1P) +
 View(summary(migrant_oaxaca))
 ```
 
@@ -520,7 +672,7 @@ ggplot(filtered_variable_effects, aes(x = Variable, y = Endowments, fill = "Endo
   geom_col(color = "black", position = position_dodge(width = 0.9)) +
   geom_errorbar(aes(ymin = Endowments - Endowments_SE, ymax = Endowments + Endowments_SE), width = 0.2, position = position_dodge(width = 0.9)) +
   labs(title = "Endowment Effects for Selected Variables", x = NULL, y = "Endowment Effect") +
-  scale_fill_manual(values = c("Endowments" = "blue")) +
+  scale_fill_manual(values = c("Endowments" = "white")) +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 
@@ -528,7 +680,41 @@ ggplot(filtered_variable_effects, aes(x = Variable, y = Coefficients, fill = "Co
   geom_col(color = "black", position = position_dodge(width = 0.9)) +
   geom_errorbar(aes(ymin = Coefficients - Coefficients_SE, ymax = Coefficients + Coefficients_SE), width = 0.2, position = position_dodge(width = 0.9)) +
   labs(title = "Coefficient Effects for Selected Variables", x = NULL, y = "Coefficient Effect") +
-  scale_fill_manual(values = c("Coefficients" = "red")) +
+  scale_fill_manual(values = c("Coefficients" = "white")) +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+```{r}
+coefficients_A <- summary(migrant_oaxaca$reg$reg.A)$coefficients
+coefficients_A <- coefficients_A[!grepl("^as\\.factor\\(ST\\)|\\(Intercept\\)", rownames(coefficients_A)), ]
+coefficients_A_df <- data.frame(
+  Variable = rownames(coefficients_A),
+  Coefficient = coefficients_A[, "Estimate"],
+  StdError = coefficients_A[, "Std. Error"],
+  Model = "Regression A"
+)
+
+coefficients_B <- summary(migrant_oaxaca$reg$reg.B)$coefficients
+coefficients_B <- coefficients_B[!grepl("^as\\.factor\\(ST\\)|\\(Intercept\\)", rownames(coefficients_B)), ]
+coefficients_B_df <- data.frame(
+  Variable = rownames(coefficients_B),
+  Coefficient = coefficients_B[, "Estimate"],
+  StdError = coefficients_B[, "Std. Error"],
+  Model = "Regression B"
+)
+
+all_coefficients <- rbind(coefficients_A_df, coefficients_B_df)
+
+ggplot(all_coefficients, aes(x = Variable, y = Coefficient, fill = Model)) +
+  geom_bar(stat = "identity", position = position_dodge(width = 0.8), width = 0.7) +
+  geom_errorbar(aes(ymin = Coefficient - StdError, ymax = Coefficient + StdError), 
+                position = position_dodge(width = 0.8), width = 0.25) +
+  coord_flip() +
+  scale_fill_manual(values = c("grey70", "grey30")) +
+  labs(title = "Comparison of Coefficients: Regression A vs. B",
+       x = "Variables",
+       y = "Coefficients") +
+  theme_minimal() +
+  theme(legend.position = "top")
 ```
