@@ -8,6 +8,9 @@ editor: source
 library(tidyverse)
 library(gridExtra)
 library(MASS)
+library(corrplot)
+library(sandwich)
+library(caret)
 ```
 
 # Reading the Data In:
@@ -181,7 +184,7 @@ HINS4:Medicaid, Medical Assistance, or any kind of government-assistance plan fo
 
 Citizen: ifelse(CIT %in% c(1, 2, 3, 4), 1, 0) 
 Foreign_born: ifelse(NATIVITY == 2, 1, 0)
-High_School_Grad: ifelse(SCHL >= 16 & SCHL < 21, 1, 0) 
+High_School_Grad: ifelse(SCHL >= 16, 1, 0) 
 Bachelors_Degree: ifelse(SCHL >= 21, 1, 0) 
 Unemployed: ifelse(ESR == 3, 1, 0) 
 HISP_dummy: ifelse(HISP == 1, 0, 1)
@@ -195,7 +198,8 @@ wb50birth: 1: Yes , 0: No/greater than 50 years/ male)
 processed_data <- processed_data %>%
   mutate(
     DIS = ifelse(DIS == 2, 0, 1),
-    HINS4 = 1 - as.numeric(HINS4))
+    HINS4 = 1 - as.numeric(HINS4), 
+    High_School_Grad = ifelse(SCHL >= 16, 1, 0))
 ```
 
 ```{r}
@@ -225,7 +229,7 @@ processed_data2 = processed_data%>%filter(!(WAGP == 0 & Unemployed == 0))
 ```
 
 ```{r}
-processed_data2 = processed_data2%>%mutate(immigrant = CIT%in%c(4,5))
+processed_data2 = processed_data2%>%mutate(immigrant = as.integer(CIT%in%c(4,5)))
 ```
 
 ```{r}
@@ -392,6 +396,41 @@ grid.arrange(a, wagecit, wagerace, wagerace2, nrow = 2, ncol = 2)
 ```{r}
 grid.arrange(loga, logwagecit, logwagerace,logwagerace2, nrow = 2, ncol = 2)
 ```
+## correlation matrix 1
+
+```{r}
+# Step 1: List of independent variables (excluding ST)
+independent_vars <- c("RAC1P", "AGEP", "SEX", "Citizen", "ENG", 
+                      "DIS", "wb50birth", "Unemployed", 
+                      "High_School_Grad", "Bachelors_Degree", 
+                      "HISP_dummy", "PAP", "HINS4", "MAR", "immigrant")
+
+# One-hot encode selected categorical variables
+processed_data_transformed <- processed_data2 %>%
+  mutate(across(c("RAC1P", "ENG", "MAR"), as.factor))%>%dplyr::select(all_of(independent_vars))
+```
+
+```{r}
+
+# One-hot encode selected categorical variables
+processed_data_transformed<- processed_data_transformed%>%
+  dummyVars(~ ., data = ., fullRank = FALSE) %>%
+  predict(newdata = processed_data_transformed)
+# Convert to data frame
+processed_data_transformed <- as.data.frame(processed_data_transformed)
+```
+
+```{r}
+# Step 3: Calculate the correlation matrix
+cor_matrix <- cor(processed_data_transformed, use = "complete.obs")
+```
+
+```{r}
+# Plot the correlation matrix with colors
+corrplot(cor_matrix, method = "color",
+         addCoef.col = 'black', tl.cex = 0.45, number.cex = 0.4)
+```
+
 
 # Multiple Regression Models Including Unemployed Individuals:
 
@@ -399,7 +438,7 @@ grid.arrange(loga, logwagecit, logwagerace,logwagerace2, nrow = 2, ncol = 2)
 
 ### mini model and summary
 ```{r}
-mini_model = lm(WAGP ~ as.factor(RAC1P), data = processed_data2)
+mini_model = lm(WAGP ~ as.factor(RAC1P) + AGEP +  SEX*Citizen + as.factor(ENG) + SEX*DIS + Unemployed + as.factor(ST) + High_School_Grad  + Bachelors_Degree + HISP_dummy + PAP + HINS4 + as.factor(MAR), data = processed_data2)
 ```
 
 ```{r}
@@ -411,12 +450,99 @@ state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients)
 summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
 
 # Print the refined summary
-summary_model
+# Extract R-squared and adjusted R-squared values
+r_squared <- summary_model$r.squared
+r_squared_adjusted <- summary_model$adj.r.squared
+
+# Print the values with labels
+cat("R-squared:", r_squared, "\n")
+cat("Adjusted R-squared:", r_squared_adjusted, "\n")
+```
+### corrected mini summary
+
+```{r}
+# Function to compute EHW robust standard errors
+compute_ehw_se <- function(model) {
+  robust_se <- sqrt(diag(vcovHC(model, type = "HC1")))
+  return(robust_se)
+}
+
+# Compute EHW robust standard errors
+ehw_se <- compute_ehw_se(mini_model)
+
+# Original coefficients, t-values, p-values, and confidence intervals
+orig_summary <- summary(mini_model)
+orig_coefficients <- coef(mini_model)
+orig_t_values <- coef(orig_summary)[, "t value"]
+orig_p_values <- coef(orig_summary)[, "Pr(>|t|)"]
+orig_conf_intervals <- confint(mini_model)
+
+# Calculate t-values using EHW standard errors
+t_values_ehw <- orig_coefficients / ehw_se
+
+# Calculate p-values using EHW standard errors
+p_values_ehw <- 2 * pt(abs(t_values_ehw), df = mini_model$df.residual, lower.tail = FALSE)
+
+# Calculate confidence bounds using EHW standard errors
+conf_level <- 0.95 # 95% confidence level
+crit_value <- qt(1 - (1 - conf_level) / 2, df = mini_model$df.residual)
+conf_bounds_ehw <- cbind(orig_coefficients - crit_value * ehw_se,
+                         orig_coefficients + crit_value * ehw_se)
+
+# Create a logical vector to filter out coefficients related to "ST"
+state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(orig_summary$coefficients))
+filter_vector <- !state_rows
+
+# Filter out coefficients, t-values, p-values, and confidence bounds for "ST"
+orig_coefficients <- orig_coefficients[filter_vector]
+orig_t_values <- orig_t_values[filter_vector]
+orig_p_values <- orig_p_values[filter_vector]
+orig_conf_intervals <- orig_conf_intervals[filter_vector, ]
+t_values_ehw <- t_values_ehw[filter_vector]
+p_values_ehw <- p_values_ehw[filter_vector]
+ehw_se <- ehw_se[filter_vector]
+conf_bounds_ehw <- conf_bounds_ehw[filter_vector, ]
+
+stars <- ifelse(orig_p_values < 0.001, "***",
+                ifelse(orig_p_values < 0.01, "**",
+                       ifelse(orig_p_values < 0.05, "*",
+                              ifelse(orig_p_values < 0.1, ".", ""))))
+
+# Compute stars for significance based on EHW p-values
+stars_ehw <- ifelse(p_values_ehw < 0.001, "***",
+                    ifelse(p_values_ehw < 0.01, "**",
+                           ifelse(p_values_ehw < 0.05, "*",
+                                  ifelse(p_values_ehw < 0.1, ".", ""))))
 ```
 
-### model0 and summary
 ```{r}
-model0 = lm(WAGP ~ as.factor(RAC1P) + AGEP +  SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth + Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + HISP_dummy + PAP + HINS4 + as.factor(MAR) + immigrant, data = processed_data2)
+results <- data.frame(orig_coefficients, orig_t_values, orig_p_values, stars,
+                      ehw_se, t_values_ehw, p_values_ehw, stars_ehw, conf_bounds_ehw)
+rownames(results) <- names(orig_coefficients)
+
+# Display results
+print(results)
+```
+
+### resid plot
+
+```{r}
+# produce residual vs. fitted plot 
+plot(fitted(mini_model), resid(mini_model)) 
+  
+# add a horizontal line at 0  
+abline(0,0) 
+```
+
+### qqplot
+```{r}
+qqnorm(resid(mini_model))
+qqline(resid(mini_model))
+```
+### model0 and summary
+
+```{r}
+model0 = lm(WAGP ~ as.factor(RAC1P) + AGEP +  SEX*Citizen + as.factor(ENG) + SEX*DIS + Unemployed + wb50birth + as.factor(ST) + High_School_Grad + Bachelors_Degree + HISP_dummy + PAP + HINS4 + as.factor(MAR) + immigrant, data = processed_data2)
 ```
 
 ```{r}
@@ -427,16 +553,10 @@ summary_model <- summary(model0)
 state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
 summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
 
-# Print the refined summary
 summary_model
 ```
-### qqplot
-```{r}
-#qqnorm(resid(model0))
-#qqline(resid(model0))
-```
-### resid plot
 
+### resid plot
 ```{r}
 # produce residual vs. fitted plot 
 #plot(fitted(model0), resid(model0)) 
@@ -462,7 +582,7 @@ grid.arrange(boxplot1, boxplot2, ncol = 2)
 
 ### mini model and summary
 ```{r}
-mini_model = lm(WAGP ~ as.factor(RAC1P), data = immigrants_only2)
+mini_model = lm(WAGP ~ as.factor(RAC1P) + AGEP +  SEX*Citizen + as.factor(ENG) + SEX*DIS + Unemployed + as.factor(ST) + High_School_Grad  + Bachelors_Degree + HISP_dummy + PAP + HINS4 + as.factor(MAR), data = immigrants_only2)
 ```
 
 ```{r}
@@ -474,11 +594,76 @@ state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients)
 summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
 
 # Print the refined summary
-summary_model
+# Extract R-squared and adjusted R-squared values
+r_squared <- summary_model$r.squared
+r_squared_adjusted <- summary_model$adj.r.squared
+
+# Print the values with labels
+cat("R-squared:", r_squared, "\n")
+cat("Adjusted R-squared:", r_squared_adjusted, "\n")
+```
+
+### corrected mini summary
+```{r}
+
+# Compute EHW robust standard errors
+ehw_se <- compute_ehw_se(mini_model)
+
+# Original coefficients, t-values, p-values, and confidence intervals
+orig_summary <- summary(mini_model)
+orig_coefficients <- coef(mini_model)
+orig_t_values <- coef(orig_summary)[, "t value"]
+orig_p_values <- coef(orig_summary)[, "Pr(>|t|)"]
+orig_conf_intervals <- confint(mini_model)
+
+# Calculate t-values using EHW standard errors
+t_values_ehw <- orig_coefficients / ehw_se
+
+# Calculate p-values using EHW standard errors
+p_values_ehw <- 2 * pt(abs(t_values_ehw), df = mini_model$df.residual, lower.tail = FALSE)
+
+# Calculate confidence bounds using EHW standard errors
+conf_level <- 0.95 # 95% confidence level
+crit_value <- qt(1 - (1 - conf_level) / 2, df = mini_model$df.residual)
+conf_bounds_ehw <- cbind(orig_coefficients - crit_value * ehw_se,
+                         orig_coefficients + crit_value * ehw_se)
+
+# Create a logical vector to filter out coefficients related to "ST"
+state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(orig_summary$coefficients))
+filter_vector <- !state_rows
+
+# Filter out coefficients, t-values, p-values, and confidence bounds for "ST"
+orig_coefficients <- orig_coefficients[filter_vector]
+orig_t_values <- orig_t_values[filter_vector]
+orig_p_values <- orig_p_values[filter_vector]
+orig_conf_intervals <- orig_conf_intervals[filter_vector, ]
+t_values_ehw <- t_values_ehw[filter_vector]
+p_values_ehw <- p_values_ehw[filter_vector]
+ehw_se <- ehw_se[filter_vector]
+conf_bounds_ehw <- conf_bounds_ehw[filter_vector, ]
+
+stars <- ifelse(orig_p_values < 0.001, "***",
+                ifelse(orig_p_values < 0.01, "**",
+                       ifelse(orig_p_values < 0.05, "*",
+                              ifelse(orig_p_values < 0.1, ".", ""))))
+
+# Compute stars for significance based on EHW p-values
+stars_ehw <- ifelse(p_values_ehw < 0.001, "***",
+                    ifelse(p_values_ehw < 0.01, "**",
+                           ifelse(p_values_ehw < 0.05, "*",
+                                  ifelse(p_values_ehw < 0.1, ".", ""))))
+```
+
+```{r}
+results <- data.frame(orig_coefficients, orig_t_values, orig_p_values, stars,
+                      ehw_se, t_values_ehw, p_values_ehw, stars_ehw, conf_bounds_ehw)
+rownames(results) <- names(orig_coefficients)
+
+# Display results
+print(results)
 ```
 
 ### model 1 and summary
-
 
 ```{r}
 model1 = lm(WAGP ~ as.factor(RAC1P) + AGEP +   SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + HISP_dummy + as.factor(MAR) + PAP + HINS4, data = immigrants_only2)
@@ -495,19 +680,12 @@ summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
 # Print the refined summary
 summary_model
 ```
-### qqplot
-
-```{r}
-#qqnorm(resid(model1))
-#qqline(resid(model1))
-```
-
 
 ## Predicting non-Immigrants Wages: Differences across Wages for non-immigrants of different Races
 
 ### mini model and summary
 ```{r}
-mini_model = lm(WAGP ~ as.factor(RAC1P), data = non_immigrants)
+mini_model = lm(WAGP ~ as.factor(RAC1P) + AGEP +  SEX*Citizen + as.factor(ENG) + SEX*DIS + Unemployed + as.factor(ST) + High_School_Grad  + Bachelors_Degree + HISP_dummy + PAP + HINS4 + as.factor(MAR), data = non_immigrants)
 ```
 
 ```{r}
@@ -519,9 +697,74 @@ state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients)
 summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
 
 # Print the refined summary
-summary_model
+# Extract R-squared and adjusted R-squared values
+r_squared <- summary_model$r.squared
+r_squared_adjusted <- summary_model$adj.r.squared
+
+# Print the values with labels
+cat("R-squared:", r_squared, "\n")
+cat("Adjusted R-squared:", r_squared_adjusted, "\n")
 ```
 
+### corrected mini summary
+```{r}
+
+# Compute EHW robust standard errors
+ehw_se <- compute_ehw_se(mini_model)
+
+# Original coefficients, t-values, p-values, and confidence intervals
+orig_summary <- summary(mini_model)
+orig_coefficients <- coef(mini_model)
+orig_t_values <- coef(orig_summary)[, "t value"]
+orig_p_values <- coef(orig_summary)[, "Pr(>|t|)"]
+orig_conf_intervals <- confint(mini_model)
+
+# Calculate t-values using EHW standard errors
+t_values_ehw <- orig_coefficients / ehw_se
+
+# Calculate p-values using EHW standard errors
+p_values_ehw <- 2 * pt(abs(t_values_ehw), df = mini_model$df.residual, lower.tail = FALSE)
+
+# Calculate confidence bounds using EHW standard errors
+conf_level <- 0.95 # 95% confidence level
+crit_value <- qt(1 - (1 - conf_level) / 2, df = mini_model$df.residual)
+conf_bounds_ehw <- cbind(orig_coefficients - crit_value * ehw_se,
+                         orig_coefficients + crit_value * ehw_se)
+
+# Create a logical vector to filter out coefficients related to "ST"
+state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(orig_summary$coefficients))
+filter_vector <- !state_rows
+
+# Filter out coefficients, t-values, p-values, and confidence bounds for "ST"
+orig_coefficients <- orig_coefficients[filter_vector]
+orig_t_values <- orig_t_values[filter_vector]
+orig_p_values <- orig_p_values[filter_vector]
+orig_conf_intervals <- orig_conf_intervals[filter_vector, ]
+t_values_ehw <- t_values_ehw[filter_vector]
+p_values_ehw <- p_values_ehw[filter_vector]
+ehw_se <- ehw_se[filter_vector]
+conf_bounds_ehw <- conf_bounds_ehw[filter_vector, ]
+
+stars <- ifelse(orig_p_values < 0.001, "***",
+                ifelse(orig_p_values < 0.01, "**",
+                       ifelse(orig_p_values < 0.05, "*",
+                              ifelse(orig_p_values < 0.1, ".", ""))))
+
+# Compute stars for significance based on EHW p-values
+stars_ehw <- ifelse(p_values_ehw < 0.001, "***",
+                    ifelse(p_values_ehw < 0.01, "**",
+                           ifelse(p_values_ehw < 0.05, "*",
+                                  ifelse(p_values_ehw < 0.1, ".", ""))))
+```
+
+```{r}
+results <- data.frame(orig_coefficients, orig_t_values, orig_p_values, stars,
+                      ehw_se, t_values_ehw, p_values_ehw, stars_ehw, conf_bounds_ehw)
+rownames(results) <- names(orig_coefficients)
+
+# Display results
+print(results)
+```
 ### model 1.2 and summary
 
 ```{r}
@@ -539,20 +782,13 @@ summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
 # Print the refined summary
 summary_model
 ```
-### qqplot
-
-```{r}
-#qqnorm(resid(model1))
-#qqline(resid(model1))
-```
-
 
 ## Predicting Wages for Asian: Differences across Wages for Asian immigrants and from top 5 countries and also non-immigrants
 
 ### selecting new data for asians
 ```{r}
-asian_only = processed_data2%>%filter(Asian==1)
-asian_only_im = immigrants_only2%>%filter(Asian==1)
+asian_only = processed_data2%>%filter(RAC1P==6)
+asian_only_im = immigrants_only2%>%filter(RAC1P==6)
 ```
 ```{r}
 largest_subgroup = asian_only_im%>%group_by(POBP)%>%
@@ -601,10 +837,10 @@ grid.arrange(density_plot_rac1p, density_plot_rac1p2, density_plot_asian, densit
 
 ```
 
-### model 1 for asian immigrants
+### model 1 for asian immigrants accounting for country of origin
 
 ```{r}
-model2 = lm(WAGP ~ AGEP +  SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + HISP_dummy + PAP + HINS4 + as.factor(MAR) , data = asian_only_im)
+model2 = lm(WAGP ~ AGEP +  SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + HISP_dummy + PAP + HINS4 + as.factor(MAR) + as.factor(POBP), data = asian_only_im)
 ```
 
 ```{r}
@@ -616,17 +852,18 @@ state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients)
 summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
 
 # Print the refined summary
-summary_model
-```
-### qqplot1
-```{r}
-#qqnorm(resid(model2))
-#qqline(resid(model2))
+# Extract R-squared and adjusted R-squared values
+r_squared <- summary_model$r.squared
+r_squared_adjusted <- summary_model$adj.r.squared
+
+# Print the values with labels
+cat("R-squared:", r_squared, "\n")
+cat("Adjusted R-squared:", r_squared_adjusted, "\n")
 ```
 
-### mini model and summary
+### mini model and summary: for asian immigrants accounting for country of origin
 ```{r}
-mini_model = lm(WAGP ~ as.factor(POBP), data = asian_only_im)
+mini_model = lm(WAGP ~ AGEP +  SEX*Citizen + as.factor(ENG) + SEX*DIS + Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + PAP + HINS4 + as.factor(MAR) + as.factor(POBP), data = asian_only_im)
 ```
 
 ```{r}
@@ -640,7 +877,65 @@ summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
 # Print the refined summary
 summary_model
 ```
+### corrected mini summary
+```{r}
 
+# Compute EHW robust standard errors
+ehw_se <- compute_ehw_se(mini_model)
+
+# Original coefficients, t-values, p-values, and confidence intervals
+orig_summary <- summary(mini_model)
+orig_coefficients <- coef(mini_model)
+orig_t_values <- coef(orig_summary)[, "t value"]
+orig_p_values <- coef(orig_summary)[, "Pr(>|t|)"]
+orig_conf_intervals <- confint(mini_model)
+
+# Calculate t-values using EHW standard errors
+t_values_ehw <- orig_coefficients / ehw_se
+
+# Calculate p-values using EHW standard errors
+p_values_ehw <- 2 * pt(abs(t_values_ehw), df = mini_model$df.residual, lower.tail = FALSE)
+
+# Calculate confidence bounds using EHW standard errors
+conf_level <- 0.95 # 95% confidence level
+crit_value <- qt(1 - (1 - conf_level) / 2, df = mini_model$df.residual)
+conf_bounds_ehw <- cbind(orig_coefficients - crit_value * ehw_se,
+                         orig_coefficients + crit_value * ehw_se)
+
+# Create a logical vector to filter out coefficients related to "ST"
+state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(orig_summary$coefficients))
+filter_vector <- !state_rows
+
+# Filter out coefficients, t-values, p-values, and confidence bounds for "ST"
+orig_coefficients <- orig_coefficients[filter_vector]
+orig_t_values <- orig_t_values[filter_vector]
+orig_p_values <- orig_p_values[filter_vector]
+orig_conf_intervals <- orig_conf_intervals[filter_vector, ]
+t_values_ehw <- t_values_ehw[filter_vector]
+p_values_ehw <- p_values_ehw[filter_vector]
+ehw_se <- ehw_se[filter_vector]
+conf_bounds_ehw <- conf_bounds_ehw[filter_vector, ]
+
+stars <- ifelse(orig_p_values < 0.001, "***",
+                ifelse(orig_p_values < 0.01, "**",
+                       ifelse(orig_p_values < 0.05, "*",
+                              ifelse(orig_p_values < 0.1, ".", ""))))
+
+# Compute stars for significance based on EHW p-values
+stars_ehw <- ifelse(p_values_ehw < 0.001, "***",
+                    ifelse(p_values_ehw < 0.01, "**",
+                           ifelse(p_values_ehw < 0.05, "*",
+                                  ifelse(p_values_ehw < 0.1, ".", ""))))
+```
+
+```{r}
+results <- data.frame(orig_coefficients, orig_t_values, orig_p_values, stars,
+                      ehw_se, t_values_ehw, p_values_ehw, stars_ehw, conf_bounds_ehw)
+rownames(results) <- names(orig_coefficients)
+
+# Display results
+print(results)
+```
 ### box plots 3 and 4
 ```{r}
 # Plot
@@ -655,28 +950,10 @@ boxplot4 <-  ggplot(asian_only_im, aes(x = factor(POBP),
 grid.arrange(boxplot3, boxplot4, ncol = 2)
 ```
 
-### model 2 for asian immigrants accounting for country of origin
+### model 2 for all asians: using immigrants instead of citizen for comparison 
 
 ```{r}
-model2.1 = lm(WAGP ~ AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + HISP_dummy+ as.factor(POBP) + PAP + HINS4 + as.factor(MAR) , data = asian_only_im)
-```
-
-```{r}
-# Get the summary of the model
-summary_model <- summary(model2.1)
-
-# Filter out rows related to state coefficients
-state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
-summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
-
-# Print the refined summary
-summary_model
-```
-
-### model 3 for all asians
-
-```{r}
-model2.2 = lm(WAGP ~ AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth + Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + HISP_dummy + PAP + HINS4 + immigrant + as.factor(MAR) , data = asian_only)
+model2.2 = lm(WAGP ~ AGEP + SEX*immigrant + as.factor(ENG) + SEX*DIS + Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + PAP + HINS4 + as.factor(MAR) , data = asian_only)
 ```
 
 ```{r}
@@ -688,13 +965,74 @@ state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients)
 summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
 
 # Print the refined summary
-summary_model
+# Extract R-squared and adjusted R-squared values
+r_squared <- summary_model$r.squared
+r_squared_adjusted <- summary_model$adj.r.squared
+
+# Print the values with labels
+cat("R-squared:", r_squared, "\n")
+cat("Adjusted R-squared:", r_squared_adjusted, "\n")
 ```
 
-### qqplot2
+### correct summary model 2.2
 ```{r}
-#qqnorm(resid(model2.1))
-#qqline(resid(model2.1))
+
+# Compute EHW robust standard errors
+ehw_se <- compute_ehw_se(model2.2)
+
+# Original coefficients, t-values, p-values, and confidence intervals
+orig_summary <- summary(model2.2)
+orig_coefficients <- coef(model2.2)
+orig_t_values <- coef(orig_summary)[, "t value"]
+orig_p_values <- coef(orig_summary)[, "Pr(>|t|)"]
+orig_conf_intervals <- confint(model2.2)
+
+# Calculate t-values using EHW standard errors
+t_values_ehw <- orig_coefficients / ehw_se
+
+# Calculate p-values using EHW standard errors
+p_values_ehw <- 2 * pt(abs(t_values_ehw), df = model2.2$df.residual, lower.tail = FALSE)
+
+# Calculate confidence bounds using EHW standard errors
+conf_level <- 0.95 # 95% confidence level
+crit_value <- qt(1 - (1 - conf_level) / 2, df = model2.2$df.residual)
+conf_bounds_ehw <- cbind(orig_coefficients - crit_value * ehw_se,
+                         orig_coefficients + crit_value * ehw_se)
+
+# Create a logical vector to filter out coefficients related to "ST"
+state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(orig_summary$coefficients))
+filter_vector <- !state_rows
+
+# Filter out coefficients, t-values, p-values, and confidence bounds for "ST"
+orig_coefficients <- orig_coefficients[filter_vector]
+orig_t_values <- orig_t_values[filter_vector]
+orig_p_values <- orig_p_values[filter_vector]
+orig_conf_intervals <- orig_conf_intervals[filter_vector, ]
+t_values_ehw <- t_values_ehw[filter_vector]
+p_values_ehw <- p_values_ehw[filter_vector]
+ehw_se <- ehw_se[filter_vector]
+conf_bounds_ehw <- conf_bounds_ehw[filter_vector, ]
+
+stars <- ifelse(orig_p_values < 0.001, "***",
+                ifelse(orig_p_values < 0.01, "**",
+                       ifelse(orig_p_values < 0.05, "*",
+                              ifelse(orig_p_values < 0.1, ".", ""))))
+
+# Compute stars for significance based on EHW p-values
+stars_ehw <- ifelse(p_values_ehw < 0.001, "***",
+                    ifelse(p_values_ehw < 0.01, "**",
+                           ifelse(p_values_ehw < 0.05, "*",
+                                  ifelse(p_values_ehw < 0.1, ".", ""))))
+```
+
+
+```{r}
+results <- data.frame(orig_coefficients, orig_t_values, orig_p_values, stars,
+                      ehw_se, t_values_ehw, p_values_ehw, stars_ehw, conf_bounds_ehw)
+rownames(results) <- names(orig_coefficients)
+
+# Display results
+print(results)
 ```
 
 
@@ -757,10 +1095,10 @@ library(gridExtra)
 grid.arrange(density_plot_rac1p, density_plot_rac1p2, density_plot_hisp, density_plot_hisp2,density_plot_hisp3, ncol = 2, nrow = 3)
 ```
 
-### HISP model 1 for immigrants
+### HISP model 1 for immigrants by POBP
 
 ```{r}
-model3 = lm(WAGP ~ as.factor(RAC1P) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + PAP + HINS4 + as.factor(MAR), data = hisp_only_im)
+model3 = lm(WAGP ~ as.factor(RAC1P) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + PAP + HINS4 + as.factor(MAR) + as.factor(POBP), data = hisp_only_im)
 ```
 
 ```{r}
@@ -771,19 +1109,13 @@ summary_model <- summary(model3)
 state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
 summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
 
-# Print the refined summary
 summary_model
 ```
 
-### qqplot 1
-```{r}
-#qqnorm(resid(model3))
-#qqline(resid(model3))
-```
 
 ### mini model and summary
 ```{r}
-mini_model = lm(WAGP ~ as.factor(POBP), data = hisp_only_im)
+mini_model = lm(WAGP ~  as.factor(RAC1P) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + PAP + HINS4 + as.factor(MAR) + as.factor(POBP), data = hisp_only_im)
 ```
 
 ```{r}
@@ -795,7 +1127,76 @@ state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients)
 summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
 
 # Print the refined summary
-summary_model
+# Extract R-squared and adjusted R-squared values
+r_squared <- summary_model$r.squared
+r_squared_adjusted <- summary_model$adj.r.squared
+
+# Print the values with labels
+cat("R-squared:", r_squared, "\n")
+cat("Adjusted R-squared:", r_squared_adjusted, "\n")
+```
+
+
+### correct summary mini_model
+
+```{r}
+
+# Compute EHW robust standard errors
+ehw_se <- compute_ehw_se(mini_model)
+
+# Original coefficients, t-values, p-values, and confidence intervals
+orig_summary <- summary(mini_model)
+orig_coefficients <- coef(mini_model)
+orig_t_values <- coef(orig_summary)[, "t value"]
+orig_p_values <- coef(orig_summary)[, "Pr(>|t|)"]
+orig_conf_intervals <- confint(mini_model)
+
+# Calculate t-values using EHW standard errors
+t_values_ehw <- orig_coefficients / ehw_se
+
+# Calculate p-values using EHW standard errors
+p_values_ehw <- 2 * pt(abs(t_values_ehw), df = mini_model$df.residual, lower.tail = FALSE)
+
+# Calculate confidence bounds using EHW standard errors
+conf_level <- 0.95 # 95% confidence level
+crit_value <- qt(1 - (1 - conf_level) / 2, df = mini_model$df.residual)
+conf_bounds_ehw <- cbind(orig_coefficients - crit_value * ehw_se,
+                         orig_coefficients + crit_value * ehw_se)
+
+# Create a logical vector to filter out coefficients related to "ST"
+state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(orig_summary$coefficients))
+filter_vector <- !state_rows
+
+# Filter out coefficients, t-values, p-values, and confidence bounds for "ST"
+orig_coefficients <- orig_coefficients[filter_vector]
+orig_t_values <- orig_t_values[filter_vector]
+orig_p_values <- orig_p_values[filter_vector]
+orig_conf_intervals <- orig_conf_intervals[filter_vector, ]
+t_values_ehw <- t_values_ehw[filter_vector]
+p_values_ehw <- p_values_ehw[filter_vector]
+ehw_se <- ehw_se[filter_vector]
+conf_bounds_ehw <- conf_bounds_ehw[filter_vector, ]
+
+stars <- ifelse(orig_p_values < 0.001, "***",
+                ifelse(orig_p_values < 0.01, "**",
+                       ifelse(orig_p_values < 0.05, "*",
+                              ifelse(orig_p_values < 0.1, ".", ""))))
+
+# Compute stars for significance based on EHW p-values
+stars_ehw <- ifelse(p_values_ehw < 0.001, "***",
+                    ifelse(p_values_ehw < 0.01, "**",
+                           ifelse(p_values_ehw < 0.05, "*",
+                                  ifelse(p_values_ehw < 0.1, ".", ""))))
+```
+
+
+```{r}
+results <- data.frame(orig_coefficients, orig_t_values, orig_p_values, stars,
+                      ehw_se, t_values_ehw, p_values_ehw, stars_ehw, conf_bounds_ehw)
+rownames(results) <- names(orig_coefficients)
+
+# Display results
+print(results)
 ```
 
 ### box plots 5 and 6
@@ -812,496 +1213,11 @@ boxplot6 <-  ggplot(hisp_only_im, aes(x = factor(POBP),
 grid.arrange(boxplot5, boxplot6, ncol = 2)
 ```
 
-### HISP model 2 for immigrants by POBP
-```{r}
-model3.1 = lm(WAGP ~ as.factor(RAC1P) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + PAP + HINS4 + as.factor(MAR) + as.factor(POBP), data = hisp_only_im)
-```
+
+### HISP model 2 for all hispanics using immigrant for comparison
 
 ```{r}
-# Get the summary of the model
-summary_model <- summary(model3.1)
-
-# Filter out rows related to state coefficients
-state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
-summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
-
-# Print the refined summary
-summary_model
-```
-
-
-### HISP model 3 for all hispanics
-
-```{r}
-model3.2 = lm(WAGP ~ as.factor(RAC1P) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + PAP + HINS4 + immigrant + as.factor(MAR), data = hisp_only)
-```
-
-```{r}
-# Get the summary of the model
-summary_model <- summary(model3.2)
-
-# Filter out rows related to state coefficients
-state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
-summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
-
-# Print the refined summary
-summary_model
-```
-
-#Part II: Repeat the Analysis Excluding Unemployed Individuals
-
-
-```{r}
-processed_data3 = processed_data2%>%filter(Unemployed==0)
-```
-```{r}
-immigrants_only = processed_data3%>%filter(CIT%in% c(4,5))
-immigrants_only2 = immigrants_only%>%filter(RAC1P%in%c(1,2,6,8,9))
-```
-
-```{r}
-non_immigrants = processed_data3%>%filter(immigrant==1, RAC1P%in%c(1,2,6,8,9))
-```
-
-# EDA Visualizations:
-
-##wage densities
-
-```{r}
-a <- ggplot(processed_data3,aes(x = WAGP, y = ..density..)) + geom_density(color = 'cyan3', fill = 'cyan3', alpha = 0.5) + 
-  labs(titles = "Distribution of Wages", x = "Wages Made in Last 12 Months")+ geom_vline(aes(xintercept=median(WAGP)),
-            color="cyan3", linetype="dashed", linewidth=0.5, alpha = 0.5)
-```
-
-```{r}
-# Calculate median wage for each citizenship group
-median_data <- processed_data3 %>%
-  group_by(Citizen) %>%
-  summarise(median_wage = median(WAGP))
-
-# Plot
-wagecit <- ggplot(processed_data3, aes(x = WAGP, fill = factor(Citizen), color = factor(Citizen))) +
-  geom_density(alpha = 0.5) +
-  geom_vline(data = median_data, aes(xintercept = median_wage, color = factor(Citizen)), 
-             linetype = "dashed", linewidth = 0.8, alpha = 0.8) +
-  labs(title = "Distribution of Wages by Citizenship Status",
-       x = "Wages Made in Last 12 Months",
-       y = "Density (Proportion)",
-       fill = "Citizen = 1",
-       color = "Citizen = 1") +
-  theme_minimal()
-```
-
-
-```{r}
-# Calculate median wage for each racial and citizenship group
-median_data_race <- processed_data3 %>%
-  filter(RAC1P %in% c(1, 2, 6, 8, 9)) %>%
-  group_by(RAC1P, Citizen) %>%
-  summarise(median_wage = median(WAGP))
-
-# Plot
-wagerace <- ggplot(processed_data3 %>% filter(RAC1P %in% c(1, 2, 6, 8, 9)), 
-                   aes(x = WAGP, fill = factor(RAC1P), color = factor(RAC1P))) +
-  geom_density(aes(y = ..density..), alpha = 0.5) +
-  geom_vline(data = median_data_race, aes(xintercept = median_wage, color = factor(RAC1P)), 
-             linetype = "dashed", linewidth = 0.5, alpha = 0.5) +
-  facet_wrap(vars(factor(Citizen))) +
-  labs(title = "Distribution of Wages by Race, Faceted by Citizenship Status",
-       x = "Wages Made in Last 12 Months",
-       y = "Density (Proportion)") +
-  theme_minimal()
-```
-
-```{r}
-median_data_race <- processed_data3 %>%
-  filter(RAC1P %in% c(1, 2, 6)) %>%
-  group_by(RAC1P, Citizen) %>%
-  summarise(median_wage = median(WAGP))
-
-wagerace2 <- ggplot(processed_data3 %>% filter(RAC1P %in% c(1, 2, 6)), 
-                    aes(x = WAGP, fill = factor(RAC1P), color = factor(RAC1P))) +
-  geom_density(aes(y = ..density..), alpha = 0.5) +
-  geom_vline(data = median_data_race, aes(xintercept = median_wage, color = factor(RAC1P)), 
-             linetype = "dashed", linewidth = 0.5, alpha = 0.5) +
-  facet_wrap(vars(factor(Citizen))) +
-  labs(title = "Distribution of Wages by 3 Races, Faceted by Citizenship Status",
-       x = "Wages Made in Last 12 Months",
-       y = "Density (Proportion)") +
-  theme_minimal()
-```
-
-##log wage densities
-
-```{r}
-# Calculate median log(wage + 1) for the entire dataset
-median_log_wage <- median(log(processed_data3$WAGP))
-
-# Plot
-loga <- ggplot(processed_data3, aes(x = log(WAGP), y = ..density..)) +
-  geom_density(color = 'cyan3', fill = 'cyan3', alpha = 0.5) + 
-  geom_vline(xintercept = median_log_wage, linetype = "dashed", linewidth = 0.5, alpha = 0.5) +
-  labs(title = "Distribution of log(Wages)", 
-       x = "log(Wages + 1) Made in Last 12 Months")
-
-```
-
-```{r}
-# Calculate median log(wage + 1) for each citizenship group
-median_data_citizen <- processed_data3 %>%
-  group_by(Citizen) %>%
-  summarise(median_log_wage = median(log(WAGP)))
-
-# Plot
-logwagecit <- ggplot(processed_data3, aes(x = log(WAGP), fill = factor(Citizen), color = factor(Citizen))) +
-  geom_density(aes(y = ..density..), alpha = 0.5) +
-  geom_vline(data = median_data_citizen, aes(xintercept = median_log_wage, color = factor(Citizen)), 
-             linetype = "dashed", linewidth = 0.5, alpha = 0.5) +
-  labs(title = "Distribution of log(Wages + 1) by Citizenship Status",
-       x = "log(Wages + 1) Made in Last 12 Months",
-       y = "Density (Proportion)", fill = "Citizen", color = "Citizen") +
-  theme_minimal()
-```
-
-```{r}
-# Calculate median log(wage + 1) for each racial and citizenship group
-median_data_race <- processed_data3 %>%
-  filter(RAC1P %in% c(1, 2, 6, 8, 9)) %>%
-  group_by(RAC1P, Citizen) %>%
-  summarise(median_log_wage = median(log(WAGP)))
-
-# Plot
-logwagerace <- ggplot(processed_data3 %>% filter(RAC1P %in% c(1, 2, 6, 8, 9)), 
-                      aes(x = log(WAGP), fill = factor(RAC1P), color = factor(RAC1P))) +
-  geom_density(aes(y = ..density..), alpha = 0.5) +
-  geom_vline(data = median_data_race, aes(xintercept = median_log_wage, color = factor(RAC1P)), 
-             linetype = "dashed", linewidth = 0.5, alpha = 0.5) +
-  facet_wrap(vars(factor(Citizen))) +
-  labs(title = "Distribution of log(Wages + 1) by Race, Faceted by Citizenship Status",
-       x = "log(Wages + 1) Made in Last 12 Months",
-       y = "Density (Proportion)") +
-  theme_minimal()
-```
-
-```{r}
-# Calculate median log(wage + 1) for each racial and citizenship group
-median_data_race <- processed_data3 %>%
-  filter(RAC1P %in% c(1, 2, 6)) %>%
-  group_by(RAC1P, Citizen) %>%
-  summarise(median_log_wage = median(log(WAGP)))
-
-# Plot
-logwagerace2 <- ggplot(processed_data3 %>% filter(RAC1P %in% c(1, 2, 6)), 
-                       aes(x = log(WAGP), fill = factor(RAC1P), color = factor(RAC1P))) +
-  geom_density(aes(y = ..density..), alpha = 0.5) +
-  geom_vline(data = median_data_race, aes(xintercept = median_log_wage, color = factor(RAC1P)), 
-             linetype = "dashed", linewidth = 0.5, alpha = 0.5) +
-  facet_wrap(vars(factor(Citizen))) +
-  labs(title = "Distribution of log(Wages + 1) by 3 Races, Faceted by Citizenship Status",
-       x = "log(Wages + 1) Made in Last 12 Months",
-       y = "Density (Proportion)") +
-  theme_minimal()
-```
-
-
-```{r}
-grid.arrange(a, wagecit, wagerace, wagerace2, nrow = 2, ncol = 2)
-```
-
-```{r}
-grid.arrange(loga, logwagecit, logwagerace,logwagerace2, nrow = 2, ncol = 2)
-```
-# T-tests Differences in Means: 
-
-```{r}
-
-```
-
-
-# Multiple Regression Models Including Unemployed Individuals:
-
-## Predicting Wages in America: 
-
-### mini model and summary
-```{r}
-mini_model = lm(log(WAGP) ~ as.factor(RAC1P), data = processed_data3)
-```
-
-```{r}
-# Get the summary of the model
-summary_model <- summary(mini_model)
-
-# Filter out rows related to state coefficients
-state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
-summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
-
-# Print the refined summary
-summary_model
-```
-
-### model0 and summary
-```{r}
-model0 = lm(log(WAGP) ~ as.factor(RAC1P) + AGEP +  SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth + as.factor(ST) + High_School_Grad + Bachelors_Degree + HISP_dummy + PAP + HINS4 + as.factor(MAR) + immigrant, data = processed_data3)
-```
-
-```{r}
-# Get the summary of the model
-summary_model <- summary(model0)
-
-# Filter out rows related to state coefficients
-state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
-summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
-
-# Print the refined summary
-summary_model
-```
-### qqplot
-```{r}
-#qqnorm(resid(model0))
-#qqline(resid(model0))
-```
-### resid plot
-
-```{r}
-# produce residual vs. fitted plot 
-#plot(fitted(model0), resid(model0)) 
-  
-# add a horizontal line at 0  
-#abline(0,0) 
-```
-### box plots 1 and 2
-```{r}
-# Plot
-boxplot1<- ggplot(processed_data3%>%filter(RAC1P %in% c(1,2,6)), aes(x = factor(RAC1P),
-                                                    y = WAGP,
-                                                    color = factor(RAC1P))) +
-  geom_boxplot() +labs(x = "Racial Group", y = "Wages in YTD") + theme_minimal()
-boxplot2 <-  ggplot(processed_data3%>%filter(RAC1P %in% c(1,2,6)), aes(x = factor(RAC1P),
-                                                    y = log(WAGP),
-                                                    color = factor(RAC1P))) +
-  geom_boxplot() +labs(x = "Racial Group", y = "Wages in YTD") + theme_minimal()
-grid.arrange(boxplot1, boxplot2, ncol = 2)
-```
-
-## Predicting Immigrants Wages: Differences across Wages for immigrants of different Races
-
-### mini model and summary
-```{r}
-mini_model = lm(log(WAGP) ~ as.factor(RAC1P), data = processed_data3)
-```
-
-```{r}
-# Get the summary of the model
-summary_model <- summary(mini_model)
-
-# Filter out rows related to state coefficients
-state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
-summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
-
-# Print the refined summary
-summary_model
-```
-
-### model 1 and summary
-
-
-```{r}
-model1 = lm(log(WAGP) ~ as.factor(RAC1P) + AGEP +   SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth + as.factor(ST) + High_School_Grad + Bachelors_Degree + HISP_dummy + as.factor(MAR) + PAP + HINS4, data = immigrants_only2)
-```
-
-```{r}
-# Get the summary of the model
-summary_model <- summary(model1)
-
-# Filter out rows related to state coefficients
-state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
-summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
-
-# Print the refined summary
-summary_model
-```
-### qqplot
-
-```{r}
-#qqnorm(resid(model1))
-#qqline(resid(model1))
-```
-
-
-## Predicting non-Immigrants Wages: Differences across Wages for non-immigrants of different Races
-
-### mini model and summary
-```{r}
-mini_model = lm(log(WAGP) ~ as.factor(RAC1P), data = non_immigrants)
-```
-
-```{r}
-# Get the summary of the model
-summary_model <- summary(mini_model)
-
-# Filter out rows related to state coefficients
-state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
-summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
-
-# Print the refined summary
-summary_model
-```
-
-### model 1.2 and summary
-
-```{r}
-model1.2 = lm(log(WAGP) ~ as.factor(RAC1P) + AGEP +  SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+  as.factor(ST) + High_School_Grad + Bachelors_Degree + HISP_dummy + as.factor(MAR) + PAP + HINS4, data = non_immigrants)
-```
-
-```{r}
-# Get the summary of the model
-summary_model <- summary(model1.2)
-
-# Filter out rows related to state coefficients
-state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
-summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
-
-# Print the refined summary
-summary_model
-```
-### qqplot
-
-```{r}
-#qqnorm(resid(model1))
-#qqline(resid(model1))
-```
-
-
-## Predicting Wages for Asian: Differences across Wages for Asian immigrants and from top 5 countries and also non-immigrants
-
-### selecting new data for asians
-```{r}
-asian_only = processed_data3%>%filter(Asian==1)
-asian_only_im = immigrants_only2%>%filter(Asian==1)
-```
-```{r}
-largest_subgroup = asian_only_im%>%group_by(POBP)%>%
-  summarise(count = n())%>%
-  mutate(per = (count/sum(count))*100)%>%
-  arrange(desc(per))%>%head(5)%>%pull(POBP)
-```
-
-```{r}
-asian_only_im = asian_only_im%>%filter(POBP %in% largest_subgroup)
-```
-
-### plots for asians
-
-```{r}
-# Create density plot for RAC1P groups
-density_plot_rac1p <- ggplot(immigrants_only2 %>% filter(RAC1P %in% c(1, 2, 6)), aes(x = log(WAGP), fill = factor(RAC1P), color = factor(RAC1P))) +
-  geom_density(aes(y = ..density..), alpha = 0.5) +
-  labs(title = "Distribution of Immigrant Wages by Race",
-       x = "Wages",
-       y = "Density (Proportion)") + ylim(0,0.6)
-
-# Create density plot for RAC1P groups
-density_plot_rac1p2 <- ggplot(processed_data3 %>% filter(RAC1P %in% c(1, 2, 6) & immigrant ==0), aes(x = log(WAGP), fill = factor(RAC1P), color = factor(RAC1P))) +
-  geom_density(aes(y = ..density..), alpha = 0.5) +
-  labs(title = "Distribution of non-Immigrant Wages by Race",
-       x = "Wages",
-       y = "Density (Proportion)") + ylim(0,0.6)
-
-# Create density plot for Asian immigrants
-density_plot_asian <- ggplot(asian_only_im, aes(x = log(WAGP), fill = factor(POBP), color = factor(POBP))) +
-  geom_density(aes(y = ..density..), alpha = 0.5) +
-  labs(title = "Distribution of Immigrant Wages for Asians by Country of Origin",
-       x = "Wages",
-       y = "Density (Proportion)")+ ylim(0,0.6)
-
-density_plot_asian2 <- ggplot(asian_only, aes(x = log(WAGP))) +
-  geom_density(aes(y = ..density..), alpha = 0.5, alpha = 0.5, fill = "cornflowerblue", color = "cornflowerblue") +
-  labs(title = "Distribution of non-Immigrants Wages for Asians",
-       x = "Wages",
-       y = "Density (Proportion)")+ ylim(0,0.6)
-
-# Combine plots side by side
-library(gridExtra)
-grid.arrange(density_plot_rac1p, density_plot_rac1p2, density_plot_asian, density_plot_asian2, ncol = 2, nrow = 2)
-
-```
-
-### model 1 for asian immigrants
-
-```{r}
-model2 = lm(log(WAGP) ~ AGEP +  SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+  as.factor(ST) + High_School_Grad + Bachelors_Degree + HISP_dummy + PAP + HINS4 + as.factor(MAR) , data = asian_only_im)
-```
-
-```{r}
-# Get the summary of the model
-summary_model <- summary(model2)
-
-# Filter out rows related to state coefficients
-state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
-summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
-
-# Print the refined summary
-summary_model
-```
-### qqplot1
-```{r}
-#qqnorm(resid(model2))
-#qqline(resid(model2))
-```
-
-### mini model and summary
-```{r}
-mini_model = lm(log(WAGP) ~ as.factor(POBP), data = asian_only_im)
-```
-
-```{r}
-# Get the summary of the model
-summary_model <- summary(mini_model)
-
-# Filter out rows related to state coefficients
-state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
-summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
-
-# Print the refined summary
-summary_model
-```
-
-### box plots 3 and 4
-```{r}
-# Plot
-boxplot3<- ggplot(asian_only_im, aes(x = factor(POBP),
-                                                    y = WAGP,
-                                                    color = factor(POBP))) +
-  geom_boxplot() +labs(x = "Place of Birth", y = "Wages in YTD") + theme_minimal()
-boxplot4 <-  ggplot(asian_only_im, aes(x = factor(POBP),
-                                                    y = log(WAGP),
-                                                    color = factor(POBP))) +
-  geom_boxplot() +labs(x = "Place of Birth", y = "Wages in YTD") + theme_minimal()
-grid.arrange(boxplot3, boxplot4, ncol = 2)
-```
-
-### model 2 for asian immigrants accounting for country of origin
-
-```{r}
-model2.1 = lm(log(WAGP) ~ AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+  as.factor(ST) + High_School_Grad + Bachelors_Degree + HISP_dummy+ as.factor(POBP) + PAP + HINS4 + as.factor(MAR) , data = asian_only_im)
-```
-
-```{r}
-# Get the summary of the model
-summary_model <- summary(model2.1)
-
-# Filter out rows related to state coefficients
-state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
-summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
-
-# Print the refined summary
-summary_model
-```
-
-### model 3 for all asians
-
-```{r}
-model2.2 = lm(log(WAGP) ~ AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth +  as.factor(ST) + High_School_Grad + Bachelors_Degree + HISP_dummy + PAP + HINS4 + immigrant + as.factor(MAR) , data = asian_only)
+model2.2 = lm(WAGP ~ as.factor(RAC1P) + AGEP + SEX*immigrant + as.factor(ENG) + SEX*DIS + Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + PAP + HINS4 + as.factor(MAR), data = hisp_only)
 ```
 
 ```{r}
@@ -1313,166 +1229,77 @@ state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients)
 summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
 
 # Print the refined summary
-summary_model
+# Extract R-squared and adjusted R-squared values
+r_squared <- summary_model$r.squared
+r_squared_adjusted <- summary_model$adj.r.squared
+
+# Print the values with labels
+cat("R-squared:", r_squared, "\n")
+cat("Adjusted R-squared:", r_squared_adjusted, "\n")
 ```
 
-### qqplot2
+
+### correct summary model 2.2
 ```{r}
-#qqnorm(resid(model2.1))
-#qqline(resid(model2.1))
+
+# Compute EHW robust standard errors
+ehw_se <- compute_ehw_se(model2.2)
+
+# Original coefficients, t-values, p-values, and confidence intervals
+orig_summary <- summary(model2.2)
+orig_coefficients <- coef(model2.2)
+orig_t_values <- coef(orig_summary)[, "t value"]
+orig_p_values <- coef(orig_summary)[, "Pr(>|t|)"]
+orig_conf_intervals <- confint(model2.2)
+
+# Calculate t-values using EHW standard errors
+t_values_ehw <- orig_coefficients / ehw_se
+
+# Calculate p-values using EHW standard errors
+p_values_ehw <- 2 * pt(abs(t_values_ehw), df = model2.2$df.residual, lower.tail = FALSE)
+
+# Calculate confidence bounds using EHW standard errors
+conf_level <- 0.95 # 95% confidence level
+crit_value <- qt(1 - (1 - conf_level) / 2, df = model2.2$df.residual)
+conf_bounds_ehw <- cbind(orig_coefficients - crit_value * ehw_se,
+                         orig_coefficients + crit_value * ehw_se)
+
+# Create a logical vector to filter out coefficients related to "ST"
+state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(orig_summary$coefficients))
+filter_vector <- !state_rows
+
+# Filter out coefficients, t-values, p-values, and confidence bounds for "ST"
+orig_coefficients <- orig_coefficients[filter_vector]
+orig_t_values <- orig_t_values[filter_vector]
+orig_p_values <- orig_p_values[filter_vector]
+orig_conf_intervals <- orig_conf_intervals[filter_vector, ]
+t_values_ehw <- t_values_ehw[filter_vector]
+p_values_ehw <- p_values_ehw[filter_vector]
+ehw_se <- ehw_se[filter_vector]
+conf_bounds_ehw <- conf_bounds_ehw[filter_vector, ]
+
+stars <- ifelse(orig_p_values < 0.001, "***",
+                ifelse(orig_p_values < 0.01, "**",
+                       ifelse(orig_p_values < 0.05, "*",
+                              ifelse(orig_p_values < 0.1, ".", ""))))
+
+# Compute stars for significance based on EHW p-values
+stars_ehw <- ifelse(p_values_ehw < 0.001, "***",
+                    ifelse(p_values_ehw < 0.01, "**",
+                           ifelse(p_values_ehw < 0.05, "*",
+                                  ifelse(p_values_ehw < 0.1, ".", ""))))
 ```
 
-
-## Predicting Immigrants Wages: Differences across Wages for Hispanic immigrants from top 5 countries and also non-immigrants
-
-### HISP data cleaning
-```{r}
-hisp_only = processed_data3%>%filter(HISP_dummy==1)
-hisp_only_im = immigrants_only2%>%filter(HISP_dummy==1)
-```
-```{r}
-largest_subgroup = hisp_only_im%>%group_by(POBP)%>%
-  summarise(count = n())%>%
-  mutate(per = (count/sum(count))*100)%>%
-  arrange(desc(per))%>%head(5)%>%pull(POBP)
-```
-
-```{r}
-hisp_only_im = hisp_only_im%>%filter(POBP %in% largest_subgroup)
-```
-
-### HISP EDA
-
-```{r}
-# Create density plot for RAC1P groups
-density_plot_rac1p <- ggplot(hisp_only_im, aes(x = log(WAGP), fill = factor(RAC1P), color = factor(RAC1P))) +
-  geom_density(aes(y = ..density..), alpha = 0.5) +
-  labs(title = "Distribution of Hispanic Immigrant Wages by Race",
-       x = "Wages",
-       y = "Density (Proportion)") + ylim(0,0.6)
-
-# Create density plot for RAC1P groups
-density_plot_rac1p2 <- ggplot(hisp_only %>% filter(immigrant ==0), aes(x = log(WAGP), fill = factor(RAC1P), color = factor(RAC1P))) +
-  geom_density(aes(y = ..density..), alpha = 0.5) +
-  labs(title = "Distribution of non-Immigrant Hispanic Wages by Race",
-       x = "Wages",
-       y = "Density (Proportion)") + ylim(0,0.6)
-
-# Create density plot for Hispanic immigrants
-density_plot_hisp <- ggplot(hisp_only_im, aes(x = log(WAGP), fill = factor(POBP), color = factor(POBP))) +
-  geom_density(aes(y = ..density..), alpha = 0.5) +
-  labs(title = "Distribution of Immigrant Wages for Hispanics by Country of Origin",
-       x = "Wages",
-       y = "Density (Proportion)")+ ylim(0,0.6)
-
-density_plot_hisp2 <- ggplot(hisp_only%>% filter(immigrant ==0), aes(x = log(WAGP))) +
-  geom_density(aes(y = ..density..), alpha = 0.5, alpha = 0.5, fill = "cornflowerblue", color = "cornflowerblue") +
-  labs(title = "Distribution of non-Immigrant Wages for Hispanics",
-       x = "Wages",
-       y = "Density (Proportion)")+ ylim(0,0.6)
-
-density_plot_hisp3 <- ggplot(hisp_only_im, aes(x = log(WAGP))) +
-  geom_density(aes(y = ..density..), alpha = 0.5, alpha = 0.5, fill = "cornflowerblue", color = "cornflowerblue") +
-  labs(title = "Distribution of Immigrant Wages for Hispanics",
-       x = "Wages",
-       y = "Density (Proportion)")+ ylim(0,0.6)
-
-# Combine plots side by side
-library(gridExtra)
-grid.arrange(density_plot_rac1p, density_plot_rac1p2, density_plot_hisp, density_plot_hisp2,density_plot_hisp3, ncol = 2, nrow = 3)
-```
-
-### HISP model 1 for immigrants
 
 ```{r}
-model3 = lm(log(WAGP) ~ as.factor(RAC1P) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+  as.factor(ST) + High_School_Grad + Bachelors_Degree + PAP + HINS4 + as.factor(MAR), data = hisp_only_im)
+results <- data.frame(orig_coefficients, orig_t_values, orig_p_values, stars,
+                      ehw_se, t_values_ehw, p_values_ehw, stars_ehw, conf_bounds_ehw)
+rownames(results) <- names(orig_coefficients)
+
+# Display results
+print(results)
 ```
 
-```{r}
-# Get the summary of the model
-summary_model <- summary(model3)
-
-# Filter out rows related to state coefficients
-state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
-summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
-
-# Print the refined summary
-summary_model
-```
-
-### qqplot 1
-```{r}
-#qqnorm(resid(model3))
-#qqline(resid(model3))
-```
-
-### mini model and summary
-```{r}
-mini_model = lm(log(WAGP) ~ as.factor(POBP), data = hisp_only_im)
-```
-
-```{r}
-# Get the summary of the model
-summary_model <- summary(mini_model)
-
-# Filter out rows related to state coefficients
-state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
-summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
-
-# Print the refined summary
-summary_model
-```
-
-### box plots 5 and 6
-```{r}
-# Plot
-boxplot5<- ggplot(hisp_only_im, aes(x = factor(POBP),
-                                                    y = WAGP,
-                                                    color = factor(POBP))) +
-  geom_boxplot() +labs(x = "Place of Birth", y = "Wages in YTD") + theme_minimal()
-boxplot6 <-  ggplot(hisp_only_im, aes(x = factor(POBP),
-                                                    y = log(WAGP),
-                                                    color = factor(POBP))) +
-  geom_boxplot() +labs(x = "Place of Birth", y = "Wages in YTD") + theme_minimal()
-grid.arrange(boxplot5, boxplot6, ncol = 2)
-```
-
-
-### HISP model 2 for immigrants by POBP
-```{r}
-model3.1 = lm(log(WAGP) ~ as.factor(RAC1P) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+  as.factor(ST) + High_School_Grad + Bachelors_Degree + PAP + HINS4 + as.factor(MAR) + as.factor(POBP), data = hisp_only_im)
-```
-
-```{r}
-# Get the summary of the model
-summary_model <- summary(model3.1)
-
-# Filter out rows related to state coefficients
-state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
-summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
-
-# Print the refined summary
-summary_model
-```
-
-
-### HISP model 3 for all hispanics
-
-```{r}
-model3.2 = lm(log(WAGP) ~ as.factor(RAC1P) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+  as.factor(ST) + High_School_Grad + Bachelors_Degree + PAP + HINS4 + immigrant + as.factor(MAR), data = hisp_only)
-```
-
-```{r}
-# Get the summary of the model
-summary_model <- summary(model3.2)
-
-# Filter out rows related to state coefficients
-state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
-summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
-
-# Print the refined summary
-summary_model
-```
 
 
 
