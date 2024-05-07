@@ -153,6 +153,31 @@ coeff_df$Signif_Stars <- ifelse(coeff_df$Robust_Pr < 0.001, "***",
 # Printing the formatted summary
 print(coeff_df, digits=3)
 ```
+```{r}
+library(ggplot2)
+# Data frame for results
+results <- data.frame(
+  Coefficient = coeff_df$Estimate,
+  SE = ehw_se[!state_rows],
+  Significance = coeff_df$Signif_Stars
+)
+rownames(results) <- rownames(coeff_df)
+
+# Prepare for plotting
+results <- results[order(results$Coefficient), ]
+results$Feature <- factor(rownames(results), levels = rownames(results))
+
+# Plot
+ggplot(results, aes(x = Feature, y = Coefficient)) +
+  geom_point(aes(color = Significance), alpha = 0.5) +
+  geom_errorbar(aes(ymin = Coefficient - SE, ymax = Coefficient + SE, color = Significance), width = 0.2) +
+  coord_flip() +
+  labs(title = "Coefficient Plot with EHW Robust Standard Errors",
+       subtitle = "Unemployment-General",
+       x = "Feature",
+       y = "Coefficient") +
+  theme_minimal() + theme(axis.text.y = element_text(size = 8))
+```
 
 Logistics regression: Risk of poverty
 ```{r}
@@ -190,6 +215,30 @@ coeff_df$Signif_Stars <- ifelse(coeff_df$Robust_Pr < 0.001, "***",
 
 # Printing the formatted summary
 print(coeff_df, digits=3)
+```
+```{r}
+# Data frame for results
+results <- data.frame(
+  Coefficient = coeff_df$Estimate,
+  SE = ehw_se[!state_rows],
+  Significance = coeff_df$Signif_Stars
+)
+rownames(results) <- rownames(coeff_df)
+
+# Prepare for plotting
+results <- results[order(results$Coefficient), ]
+results$Feature <- factor(rownames(results), levels = rownames(results))
+
+# Plot
+ggplot(results, aes(x = Feature, y = Coefficient)) +
+  geom_point(aes(color = Significance), alpha = 0.5) +
+  geom_errorbar(aes(ymin = Coefficient - SE, ymax = Coefficient + SE, color = Significance), width = 0.2) +
+  coord_flip() +
+  labs(title = "Coefficient Plot with EHW Robust Standard Errors",
+       subtitle = "Poverty risk (Public assistance income >0)-General",
+       x = "Feature",
+       y = "Coefficient") +
+  theme_minimal() + theme(axis.text.y = element_text(size = 8))
 ```
 
 Logistics regression: Probability of being on medicaid (HINS4)
@@ -230,6 +279,30 @@ coeff_df$Signif_Stars <- ifelse(coeff_df$Robust_Pr < 0.001, "***",
 
 # Printing the formatted summary
 print(coeff_df, digits=3)
+```
+```{r}
+# Data frame for results
+results <- data.frame(
+  Coefficient = coeff_df$Estimate,
+  SE = ehw_se[!state_rows],
+  Significance = coeff_df$Signif_Stars
+)
+rownames(results) <- rownames(coeff_df)
+
+# Prepare for plotting
+results <- results[order(results$Coefficient), ]
+results$Feature <- factor(rownames(results), levels = rownames(results))
+
+# Plot
+ggplot(results, aes(x = Feature, y = Coefficient)) +
+  geom_point(aes(color = Significance), alpha = 0.5) +
+  geom_errorbar(aes(ymin = Coefficient - SE, ymax = Coefficient + SE, color = Significance), width = 0.2) +
+  coord_flip() +
+  labs(title = "Coefficient Plot with EHW Robust Standard Errors",
+       subtitle = "Medicaid coverage-General",
+       x = "Feature",
+       y = "Coefficient") +
+  theme_minimal() + theme(axis.text.y = element_text(size = 8))
 ```
 
 Repeat the exercise for top Hispanic origins
@@ -288,6 +361,30 @@ coeff_df$Signif_Stars <- ifelse(coeff_df$Robust_Pr < 0.001, "***",
 # Printing the formatted summary
 print(coeff_df, digits=3)
 ```
+```{r}
+# Data frame for results
+results <- data.frame(
+  Coefficient = coeff_df$Estimate,
+  SE = ehw_se[!state_rows],
+  Significance = coeff_df$Signif_Stars
+)
+rownames(results) <- rownames(coeff_df)
+
+# Prepare for plotting
+results <- results[order(results$Coefficient), ]
+results$Feature <- factor(rownames(results), levels = rownames(results))
+
+# Plot
+ggplot(results, aes(x = Feature, y = Coefficient)) +
+  geom_point(aes(color = Significance), alpha = 0.5) +
+  geom_errorbar(aes(ymin = Coefficient - SE, ymax = Coefficient + SE, color = Significance), width = 0.2) +
+  coord_flip() +
+  labs(title = "Coefficient Plot with EHW Robust Standard Errors",
+       subtitle = "Unemployment-Hispanic immigrants from five leading countries",
+       x = "Feature",
+       y = "Coefficient") +
+  theme_minimal() + theme(axis.text.y = element_text(size = 8))
+```
 
 ```{r}
 hisp_only_im$PAP_binary = as.numeric(hisp_only_im$PAP > 0)
@@ -327,6 +424,30 @@ coeff_df$Signif_Stars <- ifelse(coeff_df$Robust_Pr < 0.001, "***",
 # Printing the formatted summary
 print(coeff_df, digits=3)
 ```
+```{r}
+# Data frame for results
+results <- data.frame(
+  Coefficient = coeff_df$Estimate,
+  SE = ehw_se[!state_rows],
+  Significance = coeff_df$Signif_Stars
+)
+rownames(results) <- rownames(coeff_df)
+
+# Prepare for plotting
+results <- results[order(results$Coefficient), ]
+results$Feature <- factor(rownames(results), levels = rownames(results))
+
+# Plot
+ggplot(results, aes(x = Feature, y = Coefficient)) +
+  geom_point(aes(color = Significance), alpha = 0.5) +
+  geom_errorbar(aes(ymin = Coefficient - SE, ymax = Coefficient + SE, color = Significance), width = 0.2) +
+  coord_flip() +
+  labs(title = "Coefficient Plot with EHW Robust Standard Errors",
+       subtitle = "Poverty risk-Hispanic immigrants from five leading countries",
+       x = "Feature",
+       y = "Coefficient") +
+  theme_minimal() + theme(axis.text.y = element_text(size = 8))
+```
 
 ```{r}
 imm_hisp_only_medicaid_model <- glm(HINS4 ~ as.factor(POBP) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + as.factor(MAR), family = binomial(), data = hisp_only_im)
@@ -364,6 +485,30 @@ coeff_df$Signif_Stars <- ifelse(coeff_df$Robust_Pr < 0.001, "***",
 
 # Printing the formatted summary
 print(coeff_df, digits=3)
+```
+```{r}
+# Data frame for results
+results <- data.frame(
+  Coefficient = coeff_df$Estimate,
+  SE = ehw_se[!state_rows],
+  Significance = coeff_df$Signif_Stars
+)
+rownames(results) <- rownames(coeff_df)
+
+# Prepare for plotting
+results <- results[order(results$Coefficient), ]
+results$Feature <- factor(rownames(results), levels = rownames(results))
+
+# Plot
+ggplot(results, aes(x = Feature, y = Coefficient)) +
+  geom_point(aes(color = Significance), alpha = 0.5) +
+  geom_errorbar(aes(ymin = Coefficient - SE, ymax = Coefficient + SE, color = Significance), width = 0.2) +
+  coord_flip() +
+  labs(title = "Coefficient Plot with EHW Robust Standard Errors",
+       subtitle = "Medicaid coverage-Hispanic immigrants from five leading countries",
+       x = "Feature",
+       y = "Coefficient") +
+  theme_minimal() + theme(axis.text.y = element_text(size = 8))
 ```
 
 Hispanics immigrants and native
@@ -405,6 +550,30 @@ coeff_df$Signif_Stars <- ifelse(coeff_df$Robust_Pr < 0.001, "***",
 # Printing the formatted summary
 print(coeff_df, digits=3)
 ```
+```{r}
+# Data frame for results
+results <- data.frame(
+  Coefficient = coeff_df$Estimate,
+  SE = ehw_se[!state_rows],
+  Significance = coeff_df$Signif_Stars
+)
+rownames(results) <- rownames(coeff_df)
+
+# Prepare for plotting
+results <- results[order(results$Coefficient), ]
+results$Feature <- factor(rownames(results), levels = rownames(results))
+
+# Plot
+ggplot(results, aes(x = Feature, y = Coefficient)) +
+  geom_point(aes(color = Significance), alpha = 0.5) +
+  geom_errorbar(aes(ymin = Coefficient - SE, ymax = Coefficient + SE, color = Significance), width = 0.2) +
+  coord_flip() +
+  labs(title = "Coefficient Plot with EHW Robust Standard Errors",
+       subtitle = "Unemployment-Hispanic immigrants and native born",
+       x = "Feature",
+       y = "Coefficient") +
+  theme_minimal() + theme(axis.text.y = element_text(size = 8))
+```
 
 ```{r}
 hisp_only_poverty_risk_model <- glm(PAP_binary ~ AGEP + SEX*immigrant + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + as.factor(MAR), family = binomial(), data = hisp_only)
@@ -443,6 +612,30 @@ coeff_df$Signif_Stars <- ifelse(coeff_df$Robust_Pr < 0.001, "***",
 # Printing the formatted summary
 print(coeff_df, digits=3)
 ```
+```{r}
+# Data frame for results
+results <- data.frame(
+  Coefficient = coeff_df$Estimate,
+  SE = ehw_se[!state_rows],
+  Significance = coeff_df$Signif_Stars
+)
+rownames(results) <- rownames(coeff_df)
+
+# Prepare for plotting
+results <- results[order(results$Coefficient), ]
+results$Feature <- factor(rownames(results), levels = rownames(results))
+
+# Plot
+ggplot(results, aes(x = Feature, y = Coefficient)) +
+  geom_point(aes(color = Significance), alpha = 0.5) +
+  geom_errorbar(aes(ymin = Coefficient - SE, ymax = Coefficient + SE, color = Significance), width = 0.2) +
+  coord_flip() +
+  labs(title = "Coefficient Plot with EHW Robust Standard Errors",
+       subtitle = "Poverty risk-Hispanic immigrants and native born",
+       x = "Feature",
+       y = "Coefficient") +
+  theme_minimal() + theme(axis.text.y = element_text(size = 8))
+```
 
 ```{r}
 hisp_only_medicaid_model <- glm(HINS4 ~ AGEP + SEX*immigrant + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + as.factor(MAR), family = binomial(), data = hisp_only)
@@ -480,6 +673,30 @@ coeff_df$Signif_Stars <- ifelse(coeff_df$Robust_Pr < 0.001, "***",
 
 # Printing the formatted summary
 print(coeff_df, digits=3)
+```
+```{r}
+# Data frame for results
+results <- data.frame(
+  Coefficient = coeff_df$Estimate,
+  SE = ehw_se[!state_rows],
+  Significance = coeff_df$Signif_Stars
+)
+rownames(results) <- rownames(coeff_df)
+
+# Prepare for plotting
+results <- results[order(results$Coefficient), ]
+results$Feature <- factor(rownames(results), levels = rownames(results))
+
+# Plot
+ggplot(results, aes(x = Feature, y = Coefficient)) +
+  geom_point(aes(color = Significance), alpha = 0.5) +
+  geom_errorbar(aes(ymin = Coefficient - SE, ymax = Coefficient + SE, color = Significance), width = 0.2) +
+  coord_flip() +
+  labs(title = "Coefficient Plot with EHW Robust Standard Errors",
+       subtitle = "Medicaid coverage-Hispanic immigrants and native born",
+       x = "Feature",
+       y = "Coefficient") +
+  theme_minimal() + theme(axis.text.y = element_text(size = 8))
 ```
 
 Repeat the exercise for top Asian origins
@@ -539,6 +756,32 @@ print(coeff_df, digits=3)
 ```
 
 ```{r}
+# Data frame for results
+results <- data.frame(
+  Coefficient = coeff_df$Estimate,
+  SE = ehw_se[!state_rows],
+  Significance = coeff_df$Signif_Stars
+)
+rownames(results) <- rownames(coeff_df)
+
+# Prepare for plotting
+results <- results[order(results$Coefficient), ]
+results$Feature <- factor(rownames(results), levels = rownames(results))
+
+# Plot
+ggplot(results, aes(x = Feature, y = Coefficient)) +
+  geom_point(aes(color = Significance), alpha = 0.5) +
+  geom_errorbar(aes(ymin = Coefficient - SE, ymax = Coefficient + SE, color = Significance), width = 0.2) +
+  coord_flip() +
+  labs(title = "Coefficient Plot with EHW Robust Standard Errors",
+       subtitle = "Unemployment-Asian immigrants from five leading countries",
+       x = "Feature",
+       y = "Coefficient") +
+  theme_minimal() + theme(axis.text.y = element_text(size = 8))
+```
+
+
+```{r}
 asian_only_im$PAP_binary = as.numeric(asian_only_im$PAP > 0)
 imm_asian_only_poverty_risk_model <- glm(PAP_binary ~ as.factor(POBP) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + as.factor(MAR), family = binomial(), data = asian_only_im)
 summary_model <- summary(imm_asian_only_poverty_risk_model)
@@ -576,6 +819,31 @@ coeff_df$Signif_Stars <- ifelse(coeff_df$Robust_Pr < 0.001, "***",
 # Printing the formatted summary
 print(coeff_df, digits=3)
 ```
+```{r}
+# Data frame for results
+results <- data.frame(
+  Coefficient = coeff_df$Estimate,
+  SE = ehw_se[!state_rows],
+  Significance = coeff_df$Signif_Stars
+)
+rownames(results) <- rownames(coeff_df)
+
+# Prepare for plotting
+results <- results[order(results$Coefficient), ]
+results$Feature <- factor(rownames(results), levels = rownames(results))
+
+# Plot
+ggplot(results, aes(x = Feature, y = Coefficient)) +
+  geom_point(aes(color = Significance), alpha = 0.5) +
+  geom_errorbar(aes(ymin = Coefficient - SE, ymax = Coefficient + SE, color = Significance), width = 0.2) +
+  coord_flip() +
+  labs(title = "Coefficient Plot with EHW Robust Standard Errors",
+       subtitle = "Poverty risk-Asian immigrants from five leading countries",
+       x = "Feature",
+       y = "Coefficient") +
+  theme_minimal() + theme(axis.text.y = element_text(size = 8))
+```
+
 
 ```{r}
 imm_asian_only_medicaid_model <- glm(HINS4 ~ as.factor(POBP) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + as.factor(MAR), family = binomial(), data = asian_only_im)
@@ -613,6 +881,30 @@ coeff_df$Signif_Stars <- ifelse(coeff_df$Robust_Pr < 0.001, "***",
 
 # Printing the formatted summary
 print(coeff_df, digits=3)
+```
+```{r}
+# Data frame for results
+results <- data.frame(
+  Coefficient = coeff_df$Estimate,
+  SE = ehw_se[!state_rows],
+  Significance = coeff_df$Signif_Stars
+)
+rownames(results) <- rownames(coeff_df)
+
+# Prepare for plotting
+results <- results[order(results$Coefficient), ]
+results$Feature <- factor(rownames(results), levels = rownames(results))
+
+# Plot
+ggplot(results, aes(x = Feature, y = Coefficient)) +
+  geom_point(aes(color = Significance), alpha = 0.5) +
+  geom_errorbar(aes(ymin = Coefficient - SE, ymax = Coefficient + SE, color = Significance), width = 0.2) +
+  coord_flip() +
+  labs(title = "Coefficient Plot with EHW Robust Standard Errors",
+       subtitle = "Medicaid coverage-Asian immigrants from five leading countries",
+       x = "Feature",
+       y = "Coefficient") +
+  theme_minimal() + theme(axis.text.y = element_text(size = 8))
 ```
 
 Asian immigrants and native
@@ -653,6 +945,30 @@ coeff_df$Signif_Stars <- ifelse(coeff_df$Robust_Pr < 0.001, "***",
 # Printing the formatted summary
 print(coeff_df, digits=3)
 ```
+```{r}
+# Data frame for results
+results <- data.frame(
+  Coefficient = coeff_df$Estimate,
+  SE = ehw_se[!state_rows],
+  Significance = coeff_df$Signif_Stars
+)
+rownames(results) <- rownames(coeff_df)
+
+# Prepare for plotting
+results <- results[order(results$Coefficient), ]
+results$Feature <- factor(rownames(results), levels = rownames(results))
+
+# Plot
+ggplot(results, aes(x = Feature, y = Coefficient)) +
+  geom_point(aes(color = Significance), alpha = 0.5) +
+  geom_errorbar(aes(ymin = Coefficient - SE, ymax = Coefficient + SE, color = Significance), width = 0.2) +
+  coord_flip() +
+  labs(title = "Coefficient Plot with EHW Robust Standard Errors",
+       subtitle = "Unemployment-Asian immigrants and native born",
+       x = "Feature",
+       y = "Coefficient") +
+  theme_minimal() + theme(axis.text.y = element_text(size = 8))
+```
 
 ```{r}
 asian_only_poverty_risk_model <- glm(PAP_binary ~  AGEP + SEX*immigrant + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + as.factor(MAR), family = binomial(), data = asian_only)
@@ -690,6 +1006,30 @@ coeff_df$Signif_Stars <- ifelse(coeff_df$Robust_Pr < 0.001, "***",
 
 # Printing the formatted summary
 print(coeff_df, digits=3)
+```
+```{r}
+# Data frame for results
+results <- data.frame(
+  Coefficient = coeff_df$Estimate,
+  SE = ehw_se[!state_rows],
+  Significance = coeff_df$Signif_Stars
+)
+rownames(results) <- rownames(coeff_df)
+
+# Prepare for plotting
+results <- results[order(results$Coefficient), ]
+results$Feature <- factor(rownames(results), levels = rownames(results))
+
+# Plot
+ggplot(results, aes(x = Feature, y = Coefficient)) +
+  geom_point(aes(color = Significance), alpha = 0.5) +
+  geom_errorbar(aes(ymin = Coefficient - SE, ymax = Coefficient + SE, color = Significance), width = 0.2) +
+  coord_flip() +
+  labs(title = "Coefficient Plot with EHW Robust Standard Errors",
+       subtitle = "Poverty risk-Asian immigrants and native born",
+       x = "Feature",
+       y = "Coefficient") +
+  theme_minimal() + theme(axis.text.y = element_text(size = 8))
 ```
 
 ```{r}
@@ -729,6 +1069,31 @@ coeff_df$Signif_Stars <- ifelse(coeff_df$Robust_Pr < 0.001, "***",
 # Printing the formatted summary
 print(coeff_df, digits=3)
 ```
+```{r}
+# Data frame for results
+results <- data.frame(
+  Coefficient = coeff_df$Estimate,
+  SE = ehw_se[!state_rows],
+  Significance = coeff_df$Signif_Stars
+)
+rownames(results) <- rownames(coeff_df)
+
+# Prepare for plotting
+results <- results[order(results$Coefficient), ]
+results$Feature <- factor(rownames(results), levels = rownames(results))
+
+# Plot
+ggplot(results, aes(x = Feature, y = Coefficient)) +
+  geom_point(aes(color = Significance), alpha = 0.5) +
+  geom_errorbar(aes(ymin = Coefficient - SE, ymax = Coefficient + SE, color = Significance), width = 0.2) +
+  coord_flip() +
+  labs(title = "Coefficient Plot with EHW Robust Standard Errors",
+       subtitle = "Medicaid coverage-Asian immigrants and native born",
+       x = "Feature",
+       y = "Coefficient") +
+  theme_minimal() + theme(axis.text.y = element_text(size = 8))
+```
+
 
 Blinder Oxaca
 
