@@ -245,7 +245,7 @@ immigrants_only2 = immigrants_only%>%filter(RAC1P%in%c(1,2,6,8,9))
 ```
 
 ```{r}
-non_immigrants = processed_data2%>%filter(immigrant==1, RAC1P%in%c(1,2,6,8,9))
+non_immigrants = processed_data2%>%filter(immigrant==0, RAC1P%in%c(1,2,6,8,9))
 ```
 
 # EDA Visualizations:
@@ -742,7 +742,7 @@ summary_model
 
 ### mini model and summary
 ```{r}
-mini_model = lm(WAGP ~ as.factor(RAC1P) + AGEP +  SEX*Citizen + as.factor(ENG) + SEX*DIS + Unemployed + as.factor(ST) + wb50birth + High_School_Grad  + Bachelors_Degree + HISP_dummy + PAP + HINS4 + as.factor(MAR), data = non_immigrants)
+mini_model = lm(WAGP ~ as.factor(RAC1P) + AGEP + as.factor(ENG) + SEX*DIS + Unemployed + as.factor(ST) + wb50birth + High_School_Grad  + Bachelors_Degree + HISP_dummy + PAP + HINS4 + as.factor(MAR), data = non_immigrants)
 ```
 
 ```{r}
@@ -787,9 +787,12 @@ conf_level <- 0.95 # 95% confidence level
 crit_value <- qt(1 - (1 - conf_level) / 2, df = mini_model$df.residual)
 conf_bounds_ehw <- cbind(orig_coefficients - crit_value * ehw_se,
                          orig_coefficients + crit_value * ehw_se)
+```
+
+```{r}
 
 # Create a logical vector to filter out coefficients related to "ST"
-state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(orig_summary$coefficients))
+state_rows <- grepl("^as\\.factor\\(ST\\)\\d+", rownames(orig_summary$coefficients))
 filter_vector <- !state_rows
 
 # Filter out coefficients, t-values, p-values, and confidence bounds for "ST"
@@ -797,6 +800,8 @@ orig_coefficients <- orig_coefficients[filter_vector]
 orig_t_values <- orig_t_values[filter_vector]
 orig_p_values <- orig_p_values[filter_vector]
 orig_conf_intervals <- orig_conf_intervals[filter_vector, ]
+```
+```{r}
 t_values_ehw <- t_values_ehw[filter_vector]
 p_values_ehw <- p_values_ehw[filter_vector]
 ehw_se <- ehw_se[filter_vector]
@@ -813,7 +818,6 @@ stars_ehw <- ifelse(p_values_ehw < 0.001, "***",
                            ifelse(p_values_ehw < 0.05, "*",
                                   ifelse(p_values_ehw < 0.1, ".", ""))))
 ```
-
 ```{r}
 results <- data.frame(orig_coefficients, orig_t_values, orig_p_values, stars,
                       ehw_se, t_values_ehw, p_values_ehw, stars_ehw, conf_bounds_ehw)
@@ -845,7 +849,7 @@ ggplot(plot_data, aes(x = Feature, y = Coefficient)) +
     geom_errorbar(aes(ymin = Coefficient - SE, ymax = Coefficient + SE, color = Significance), width = 0.6)  +
     coord_flip() +
     labs(title = "Coefficient Plot with EHW Robust Standard Errors",
-         subtitle = "Model (1): all non-Immigrants",
+         subtitle = "Model (1.2): all non-Immigrants",
          x = "Feature",
          y = "Coefficient") +
     theme_minimal() + theme(axis.text.y = element_text(size = 8))
