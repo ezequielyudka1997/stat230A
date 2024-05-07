@@ -274,7 +274,7 @@ wagecit <- ggplot(processed_data2, aes(x = WAGP, fill = factor(Citizen), color =
        y = "Density (Proportion)",
        fill = "Citizen = 1",
        color = "Citizen = 1") +
-  theme_minimal()
+  theme_minimal() 
 ```
 
 
@@ -295,7 +295,8 @@ wagerace <- ggplot(processed_data2 %>% filter(RAC1P %in% c(1, 2, 6, 8, 9)),
   labs(title = "Distribution of Wages by Race, Faceted by Citizenship Status",
        x = "Wages Made in Last 12 Months",
        y = "Density (Proportion)") +
-  theme_minimal()
+  theme_minimal()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
 ```{r}
@@ -313,7 +314,8 @@ wagerace2 <- ggplot(processed_data2 %>% filter(RAC1P %in% c(1, 2, 6)),
   labs(title = "Distribution of Wages by 3 Races, Faceted by Citizenship Status",
        x = "Wages Made in Last 12 Months",
        y = "Density (Proportion)") +
-  theme_minimal()
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
 ##log wage densities
@@ -365,7 +367,8 @@ logwagerace <- ggplot(processed_data2 %>% filter(RAC1P %in% c(1, 2, 6, 8, 9)),
   labs(title = "Distribution of log(Wages + 1) by Race, Faceted by Citizenship Status",
        x = "log(Wages + 1) Made in Last 12 Months",
        y = "Density (Proportion)") +
-  theme_minimal()
+  theme_minimal()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
 ```{r}
@@ -385,7 +388,8 @@ logwagerace2 <- ggplot(processed_data2 %>% filter(RAC1P %in% c(1, 2, 6)),
   labs(title = "Distribution of log(Wages + 1) by 3 Races, Faceted by Citizenship Status",
        x = "log(Wages + 1) Made in Last 12 Months",
        y = "Density (Proportion)") +
-  theme_minimal()
+  theme_minimal()+
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
 
 
@@ -438,7 +442,7 @@ corrplot(cor_matrix, method = "color",
 
 ### mini model and summary
 ```{r}
-mini_model = lm(WAGP ~ as.factor(RAC1P) + AGEP +  SEX*Citizen + as.factor(ENG) + SEX*DIS + Unemployed + as.factor(ST) + High_School_Grad  + Bachelors_Degree + HISP_dummy + PAP + HINS4 + as.factor(MAR), data = processed_data2)
+mini_model = lm(WAGP ~ as.factor(RAC1P) + AGEP +  SEX*Citizen + as.factor(ENG) + SEX*DIS + Unemployed  + wb50birth + as.factor(ST) + High_School_Grad  + Bachelors_Degree + HISP_dummy + PAP + HINS4 + as.factor(MAR), data = processed_data2)
 ```
 
 ```{r}
@@ -523,6 +527,32 @@ rownames(results) <- names(orig_coefficients)
 # Display results
 print(results)
 ```
+### coef plot
+```{r}
+# Prepare data for plotting
+plot_data <- data.frame(
+    Feature = rownames(results),
+    Coefficient = results$orig_coefficients,
+    SE = results$ehw_se,
+    Significance = results$stars
+)
+plot_data <- plot_data[order(plot_data$Coefficient), ]
+plot_data$Feature <- factor(plot_data$Feature, levels = plot_data$Feature)
+```
+
+```{r}
+
+# Plot using ggplot
+ggplot(plot_data, aes(x = Feature, y = Coefficient)) +
+    geom_point(aes(color = Significance), alpha = 0.5) +
+    geom_errorbar(aes(ymin = Coefficient - SE, ymax = Coefficient + SE, color = Significance), width = 0.6)  +
+    coord_flip() +
+    labs(title = "Coefficient Plot with EHW Robust Standard Errors",
+         subtitle = "Model (1): all respondents",
+         x = "Feature",
+         y = "Coefficient") +
+    theme_minimal() + theme(axis.text.y = element_text(size = 8))
+```
 
 ### resid plot
 
@@ -541,11 +571,11 @@ qqline(resid(mini_model))
 ```
 ### model0 and summary
 
-```{r}
+```{r, eval=FALSE}
 model0 = lm(WAGP ~ as.factor(RAC1P) + AGEP +  SEX*Citizen + as.factor(ENG) + SEX*DIS + Unemployed + wb50birth + as.factor(ST) + High_School_Grad + Bachelors_Degree + HISP_dummy + PAP + HINS4 + as.factor(MAR) + immigrant, data = processed_data2)
 ```
 
-```{r}
+```{r, eval=FALSE}
 # Get the summary of the model
 summary_model <- summary(model0)
 
@@ -582,7 +612,7 @@ grid.arrange(boxplot1, boxplot2, ncol = 2)
 
 ### mini model and summary
 ```{r}
-mini_model = lm(WAGP ~ as.factor(RAC1P) + AGEP +  SEX*Citizen + as.factor(ENG) + SEX*DIS + Unemployed + as.factor(ST) + High_School_Grad  + Bachelors_Degree + HISP_dummy + PAP + HINS4 + as.factor(MAR), data = immigrants_only2)
+mini_model = lm(WAGP ~ as.factor(RAC1P) + AGEP +  SEX*Citizen + as.factor(ENG) + SEX*DIS + Unemployed + as.factor(ST) + wb50birth + High_School_Grad  + Bachelors_Degree + HISP_dummy + PAP + HINS4 + as.factor(MAR) + Years_in_US, data = immigrants_only2)
 ```
 
 ```{r}
@@ -663,13 +693,40 @@ rownames(results) <- names(orig_coefficients)
 print(results)
 ```
 
-### model 1 and summary
-
+### coef plot
 ```{r}
-model1 = lm(WAGP ~ as.factor(RAC1P) + AGEP +   SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + HISP_dummy + as.factor(MAR) + PAP + HINS4, data = immigrants_only2)
+# Prepare data for plotting
+plot_data <- data.frame(
+    Feature = rownames(results),
+    Coefficient = results$orig_coefficients,
+    SE = results$ehw_se,
+    Significance = results$stars
+)
+plot_data <- plot_data[order(plot_data$Coefficient), ]
+plot_data$Feature <- factor(plot_data$Feature, levels = plot_data$Feature)
 ```
 
 ```{r}
+
+# Plot using ggplot
+ggplot(plot_data, aes(x = Feature, y = Coefficient)) +
+    geom_point(aes(color = Significance), alpha = 0.5) +
+    geom_errorbar(aes(ymin = Coefficient - SE, ymax = Coefficient + SE, color = Significance), width = 0.6)  +
+    coord_flip() +
+    labs(title = "Coefficient Plot with EHW Robust Standard Errors",
+         subtitle = "Model (2): all Immigrants",
+         x = "Feature",
+         y = "Coefficient") +
+    theme_minimal() + theme(axis.text.y = element_text(size = 8))
+```
+
+### model 1 and summary
+
+```{r, eval = FALSE}
+model1 = lm(WAGP ~ as.factor(RAC1P) + AGEP +   SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + HISP_dummy + as.factor(MAR) + PAP + HINS4 + Years_in_US, data = immigrants_only2)
+```
+
+```{r, eval=FALSE}
 # Get the summary of the model
 summary_model <- summary(model1)
 
@@ -685,7 +742,7 @@ summary_model
 
 ### mini model and summary
 ```{r}
-mini_model = lm(WAGP ~ as.factor(RAC1P) + AGEP +  SEX*Citizen + as.factor(ENG) + SEX*DIS + Unemployed + as.factor(ST) + High_School_Grad  + Bachelors_Degree + HISP_dummy + PAP + HINS4 + as.factor(MAR), data = non_immigrants)
+mini_model = lm(WAGP ~ as.factor(RAC1P) + AGEP +  SEX*Citizen + as.factor(ENG) + SEX*DIS + Unemployed + as.factor(ST) + wb50birth + High_School_Grad  + Bachelors_Degree + HISP_dummy + PAP + HINS4 + as.factor(MAR), data = non_immigrants)
 ```
 
 ```{r}
@@ -765,13 +822,42 @@ rownames(results) <- names(orig_coefficients)
 # Display results
 print(results)
 ```
-### model 1.2 and summary
+
+### coef plot 
 
 ```{r}
-model1.2 = lm(WAGP ~ as.factor(RAC1P) + AGEP +  SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + HISP_dummy + as.factor(MAR) + PAP + HINS4, data = non_immigrants)
+# Prepare data for plotting
+plot_data <- data.frame(
+    Feature = rownames(results),
+    Coefficient = results$orig_coefficients,
+    SE = results$ehw_se,
+    Significance = results$stars
+)
+plot_data <- plot_data[order(plot_data$Coefficient), ]
+plot_data$Feature <- factor(plot_data$Feature, levels = plot_data$Feature)
 ```
 
 ```{r}
+
+# Plot using ggplot
+ggplot(plot_data, aes(x = Feature, y = Coefficient)) +
+    geom_point(aes(color = Significance), alpha = 0.5) +
+    geom_errorbar(aes(ymin = Coefficient - SE, ymax = Coefficient + SE, color = Significance), width = 0.6)  +
+    coord_flip() +
+    labs(title = "Coefficient Plot with EHW Robust Standard Errors",
+         subtitle = "Model (1): all non-Immigrants",
+         x = "Feature",
+         y = "Coefficient") +
+    theme_minimal() + theme(axis.text.y = element_text(size = 8))
+```
+
+### model 1.2 and summary
+
+```{r, eval=FALSE}
+model1.2 = lm(WAGP ~ as.factor(RAC1P) + AGEP +  SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + HISP_dummy + as.factor(MAR) + PAP + HINS4, data = non_immigrants)
+```
+
+```{r, eval=FALSE}
 # Get the summary of the model
 summary_model <- summary(model1.2)
 
@@ -804,46 +890,78 @@ asian_only_im = asian_only_im%>%filter(POBP %in% largest_subgroup)
 ### plots for asians
 
 ```{r}
+median_rac1p_immigrants <- immigrants_only2 %>% 
+    filter(RAC1P %in% c(1, 2, 6)) %>%
+    group_by(RAC1P) %>%
+    summarize(median_wage = median(log(WAGP + 1), na.rm = TRUE))
+
+median_rac1p_nonimmigrants <- processed_data2 %>% 
+    filter(RAC1P %in% c(1, 2, 6), immigrant == 0) %>%
+    group_by(RAC1P) %>%
+    summarize(median_wage = median(log(WAGP + 1), na.rm = TRUE))
+
+median_asian_immigrants <- asian_only_im %>%
+    group_by(POBP) %>%
+    summarize(median_wage = median(log(WAGP + 1), na.rm = TRUE))
+
+median_asian_nonimmigrants <- asian_only %>%filter(immigrant == 0)%>%
+    summarize(median_wage = median(log(WAGP + 1), na.rm = TRUE))
+
+median_asian_immigrants2 <- asian_only %>%filter(immigrant == 1)%>%
+    summarize(median_wage = median(log(WAGP + 1), na.rm = TRUE))
+```
+
+
+```{r}
 # Create density plot for RAC1P groups
 density_plot_rac1p <- ggplot(immigrants_only2 %>% filter(RAC1P %in% c(1, 2, 6)), aes(x = log(WAGP + 1), fill = factor(RAC1P), color = factor(RAC1P))) +
   geom_density(aes(y = ..density..), alpha = 0.5) +
-  labs(title = "Distribution of Immigrant Wages by Race",
-       x = "Wages",
-       y = "Density (Proportion)") + ylim(0,0.6)
+  labs(title = "Immigrant log(Wages + 1) by Race",
+       x = "log(Wages + 1)",
+       y = "Density (Proportion)") + ylim(0,0.6)+
+    geom_vline(data = median_rac1p_immigrants, aes(xintercept = median_wage, color = factor(RAC1P)), linetype = "dashed")
 
 # Create density plot for RAC1P groups
 density_plot_rac1p2 <- ggplot(processed_data2 %>% filter(RAC1P %in% c(1, 2, 6) & immigrant ==0), aes(x = log(WAGP + 1), fill = factor(RAC1P), color = factor(RAC1P))) +
   geom_density(aes(y = ..density..), alpha = 0.5) +
-  labs(title = "Distribution of non-Immigrant Wages by Race",
-       x = "Wages",
-       y = "Density (Proportion)") + ylim(0,0.6)
+  labs(title = "non-Immigrant log(Wages + 1) by Race",
+       x = "log(Wages + 1)",
+       y = "Density (Proportion)") + ylim(0,0.6)+geom_vline(data = median_rac1p_nonimmigrants, aes(xintercept = median_wage, color = factor(RAC1P)), linetype = "dashed")
 
-# Create density plot for Asian immigrants
+#Create density plot for Asian immigrants
+
 density_plot_asian <- ggplot(asian_only_im, aes(x = log(WAGP + 1), fill = factor(POBP), color = factor(POBP))) +
   geom_density(aes(y = ..density..), alpha = 0.5) +
-  labs(title = "Distribution of Immigrant Wages for Asians by Country of Origin",
-       x = "Wages",
-       y = "Density (Proportion)")+ ylim(0,0.6)
+  labs(title = "Immigrant log(Wages + 1) for Asians by Place of Birth",
+       x = "log(Wages + 1)",
+       y = "Density (Proportion)")+ ylim(0,0.6)+geom_vline(data = median_asian_immigrants, aes(xintercept = median_wage, color = factor(POBP)), linetype = "dashed")
 
-density_plot_asian2 <- ggplot(asian_only, aes(x = log(WAGP + 1))) +
+density_plot_asian2 <- ggplot(asian_only%>%filter(immigrant == 0), aes(x = log(WAGP + 1))) +
   geom_density(aes(y = ..density..), alpha = 0.5, alpha = 0.5, fill = "cornflowerblue", color = "cornflowerblue") +
-  labs(title = "Distribution of non-Immigrants Wages for Asians",
-       x = "Wages",
-       y = "Density (Proportion)")+ ylim(0,0.6)
+  labs(title = "non-Immigrants log(Wages + 1) for Asians",
+       x = "log(Wages + 1)",
+       y = "Density (Proportion)")+ ylim(0,0.6)+
+    geom_vline(data = median_asian_nonimmigrants, aes(xintercept = median_wage), linetype = "dashed", color = "cornflowerblue")
 
+density_plot_asian3 <- ggplot(asian_only%>%filter(immigrant == 1), aes(x = log(WAGP + 1))) +
+  geom_density(aes(y = ..density..), alpha = 0.5, alpha = 0.5, fill = "cornflowerblue", color = "cornflowerblue") +
+  labs(title = "Immigrant log(Wages + 1) for Asians",
+       x = "log(Wages + 1)",
+       y = "Density (Proportion)")+ ylim(0,0.6)+
+    geom_vline(data = median_asian_immigrants2, aes(xintercept = median_wage), linetype = "dashed", color = "cornflowerblue")
 # Combine plots side by side
 library(gridExtra)
-grid.arrange(density_plot_rac1p, density_plot_rac1p2, density_plot_asian, density_plot_asian2, ncol = 2, nrow = 2)
+grid.arrange(density_plot_rac1p, density_plot_rac1p2, density_plot_asian, density_plot_asian2, density_plot_asian3, ncol = 2, nrow = 3)
 
 ```
 
 ### model 1 for asian immigrants accounting for country of origin
 
-```{r}
-model2 = lm(WAGP ~ AGEP +  SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + HISP_dummy + PAP + HINS4 + as.factor(MAR) + as.factor(POBP), data = asian_only_im)
+```{r, eval=FALSE}
+model2 = lm(WAGP ~ AGEP +  SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + HISP_dummy + PAP + HINS4 + as.factor(MAR) + as.factor(POBP) + Years_in_US, data = asian_only_im)
 ```
 
-```{r}
+```{r, eval=FALSE}
 # Get the summary of the model
 summary_model <- summary(model2)
 
@@ -863,7 +981,7 @@ cat("Adjusted R-squared:", r_squared_adjusted, "\n")
 
 ### mini model and summary: for asian immigrants accounting for country of origin
 ```{r}
-mini_model = lm(WAGP ~ AGEP +  SEX*Citizen + as.factor(ENG) + SEX*DIS + Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + PAP + HINS4 + as.factor(MAR) + as.factor(POBP), data = asian_only_im)
+mini_model = lm(WAGP ~ AGEP +  SEX*Citizen + as.factor(ENG) + SEX*DIS + Unemployed + as.factor(ST) + wb50birth +  High_School_Grad + Bachelors_Degree + PAP + HINS4 + as.factor(MAR) + as.factor(POBP) + Years_in_US, data = asian_only_im)
 ```
 
 ```{r}
@@ -936,6 +1054,32 @@ rownames(results) <- names(orig_coefficients)
 # Display results
 print(results)
 ```
+### coef plot
+```{r}
+# Prepare data for plotting
+plot_data <- data.frame(
+    Feature = rownames(results),
+    Coefficient = results$orig_coefficients,
+    SE = results$ehw_se,
+    Significance = results$stars
+)
+plot_data <- plot_data[order(plot_data$Coefficient), ]
+plot_data$Feature <- factor(plot_data$Feature, levels = plot_data$Feature)
+```
+
+```{r}
+
+# Plot using ggplot
+ggplot(plot_data, aes(x = Feature, y = Coefficient)) +
+    geom_point(aes(color = Significance), alpha = 0.5) +
+    geom_errorbar(aes(ymin = Coefficient - SE, ymax = Coefficient + SE, color = Significance), width = 0.6)  +
+    coord_flip() +
+    labs(title = "Coefficient Plot with EHW Robust Standard Errors",
+         subtitle = "Model (3): all Asian Immigrants",
+         x = "Feature",
+         y = "Coefficient") +
+    theme_minimal() + theme(axis.text.y = element_text(size = 8))
+```
 ### box plots 3 and 4
 ```{r}
 # Plot
@@ -953,7 +1097,7 @@ grid.arrange(boxplot3, boxplot4, ncol = 2)
 ### model 2 for all asians: using immigrants instead of citizen for comparison 
 
 ```{r}
-model2.2 = lm(WAGP ~ AGEP + SEX*immigrant + as.factor(ENG) + SEX*DIS + Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + PAP + HINS4 + as.factor(MAR) , data = asian_only)
+model2.2 = lm(WAGP ~ AGEP + SEX*immigrant + as.factor(ENG) + SEX*DIS + Unemployed + as.factor(ST) + wb50birth + High_School_Grad + Bachelors_Degree + PAP + HINS4 + as.factor(MAR) , data = asian_only)
 ```
 
 ```{r}
@@ -1035,6 +1179,31 @@ rownames(results) <- names(orig_coefficients)
 print(results)
 ```
 
+```{r}
+# Prepare data for plotting
+plot_data <- data.frame(
+    Feature = rownames(results),
+    Coefficient = results$orig_coefficients,
+    SE = results$ehw_se,
+    Significance = results$stars
+)
+plot_data <- plot_data[order(plot_data$Coefficient), ]
+plot_data$Feature <- factor(plot_data$Feature, levels = plot_data$Feature)
+```
+
+```{r}
+
+# Plot using ggplot
+ggplot(plot_data, aes(x = Feature, y = Coefficient)) +
+    geom_point(aes(color = Significance), alpha = 0.5) +
+    geom_errorbar(aes(ymin = Coefficient - SE, ymax = Coefficient + SE, color = Significance), width = 0.6)  +
+    coord_flip() +
+    labs(title = "Coefficient Plot with EHW Robust Standard Errors",
+         subtitle = "Model (4): all Asians",
+         x = "Feature",
+         y = "Coefficient") +
+    theme_minimal() + theme(axis.text.y = element_text(size = 8))
+```
 
 ## Predicting Immigrants Wages: Differences across Wages for Hispanic immigrants from top 5 countries and also non-immigrants
 
@@ -1057,51 +1226,93 @@ hisp_only_im = hisp_only_im%>%filter(POBP %in% largest_subgroup)
 ### HISP EDA
 
 ```{r}
-# Create density plot for RAC1P groups
-density_plot_rac1p <- ggplot(hisp_only_im, aes(x = log(WAGP + 1), fill = factor(RAC1P), color = factor(RAC1P))) +
-  geom_density(aes(y = ..density..), alpha = 0.5) +
-  labs(title = "Distribution of Hispanic Immigrant Wages by Race",
-       x = "Wages",
-       y = "Density (Proportion)") + ylim(0,0.6)
+# Calculate median wages for each plot
 
-# Create density plot for RAC1P groups
-density_plot_rac1p2 <- ggplot(hisp_only %>% filter(immigrant ==0), aes(x = log(WAGP + 1), fill = factor(RAC1P), color = factor(RAC1P))) +
-  geom_density(aes(y = ..density..), alpha = 0.5) +
-  labs(title = "Distribution of non-Immigrant Hispanic Wages by Race",
-       x = "Wages",
-       y = "Density (Proportion)") + ylim(0,0.6)
+# Plot 1
+median_rac1p_immigrants <- hisp_only_im %>%
+    group_by(RAC1P) %>%
+    summarize(median_wage = median(log(WAGP + 1), na.rm = TRUE))
+
+# Plot 2
+median_rac1p_nonimmigrants <- hisp_only %>%
+    filter(immigrant == 0) %>%
+    group_by(RAC1P) %>%
+    summarize(median_wage = median(log(WAGP + 1), na.rm = TRUE))
+
+# Plot 3
+median_hisp_immigrants <- hisp_only_im %>%
+    group_by(POBP) %>%
+    summarize(median_wage = median(log(WAGP + 1), na.rm = TRUE))
+
+# Plot 4
+median_hisp_nonimmigrants <- hisp_only %>%
+    filter(immigrant == 0) %>%
+    summarize(median_wage = median(log(WAGP + 1), na.rm = TRUE))
+
+# Plot 5
+median_hisp_only_im <- hisp_only %>%
+    filter(immigrant == 1) %>%
+    summarize(median_wage = median(log(WAGP + 1), na.rm = TRUE))
+```
+
+```{r}
+# Create density plot for RAC1P groups (immigrants)
+density_plot_rac1p <- ggplot(hisp_only_im, aes(x = log(WAGP + 1), fill = factor(RAC1P), color = factor(RAC1P))) +
+    geom_density(aes(y = ..density..), alpha = 0.5) +
+    geom_vline(data = median_rac1p_immigrants, aes(xintercept = median_wage, color = factor(RAC1P)), linetype = "dashed") +
+    labs(title = "Hispanic Immigrant log(Wages + 1) by Race",
+         x = "log(Wages + 1)",
+         y = "Density (Proportion)") +
+    ylim(0, 0.6)
+
+# Create density plot for RAC1P groups (non-immigrants)
+density_plot_rac1p2 <- ggplot(hisp_only %>% filter(immigrant == 0), aes(x = log(WAGP + 1), fill = factor(RAC1P), color = factor(RAC1P))) +
+    geom_density(aes(y = ..density..), alpha = 0.5) +
+    geom_vline(data = median_rac1p_nonimmigrants, aes(xintercept = median_wage, color = factor(RAC1P)), linetype = "dashed") +
+    labs(title = "non-Immigrant Hispanic log(Wages + 1) by Race",
+         x = "log(Wages + 1)",
+         y = "Density (Proportion)") +
+    ylim(0, 0.6)
+
+# Create density plot for Hispanic immigrants by country of origin
+density_plot_hisp <- ggplot(hisp_only_im, aes(x = log(WAGP + 1), fill = factor(POBP), color = factor(POBP))) +
+    geom_density(aes(y = ..density..), alpha = 0.5) +
+    geom_vline(data = median_hisp_immigrants, aes(xintercept = median_wage, color = factor(POBP)), linetype = "dashed") +
+    labs(title = "log(Wages + 1) for Hispanics by Place of Birth",
+         x = "log(Wages + 1)",
+         y = "Density (Proportion)") +
+    ylim(0, 0.6)
+
+# Create density plot for Hispanic non-immigrants
+density_plot_hisp2 <- ggplot(hisp_only %>% filter(immigrant == 0), aes(x = log(WAGP + 1))) +
+    geom_density(aes(y = ..density..), alpha = 0.5, fill = "cornflowerblue", color = "cornflowerblue") +
+    geom_vline(data = median_hisp_nonimmigrants, aes(xintercept = median_wage), linetype = "dashed", color = "cornflowerblue") +
+    labs(title = "non-Immigrant log(Wages + 1) for Hispanics",
+         x = "log(Wages + 1)",
+         y = "Density (Proportion)") +
+    ylim(0, 0.6)
 
 # Create density plot for Hispanic immigrants
-density_plot_hisp <- ggplot(hisp_only_im, aes(x = log(WAGP + 1), fill = factor(POBP), color = factor(POBP))) +
-  geom_density(aes(y = ..density..), alpha = 0.5) +
-  labs(title = "Distribution of Immigrant Wages for Hispanics by Country of Origin",
-       x = "Wages",
-       y = "Density (Proportion)")+ ylim(0,0.6)
-
-density_plot_hisp2 <- ggplot(hisp_only%>% filter(immigrant ==0), aes(x = log(WAGP + 1))) +
-  geom_density(aes(y = ..density..), alpha = 0.5, alpha = 0.5, fill = "cornflowerblue", color = "cornflowerblue") +
-  labs(title = "Distribution of non-Immigrant Wages for Hispanics",
-       x = "Wages",
-       y = "Density (Proportion)")+ ylim(0,0.6)
-
-density_plot_hisp3 <- ggplot(hisp_only_im, aes(x = log(WAGP + 1))) +
-  geom_density(aes(y = ..density..), alpha = 0.5, alpha = 0.5, fill = "cornflowerblue", color = "cornflowerblue") +
-  labs(title = "Distribution of Immigrant Wages for Hispanics",
-       x = "Wages",
-       y = "Density (Proportion)")+ ylim(0,0.6)
+density_plot_hisp3 <- ggplot(hisp_only %>% filter(immigrant == 1), aes(x = log(WAGP + 1))) +
+    geom_density(aes(y = ..density..), alpha = 0.5, fill = "cornflowerblue", color = "cornflowerblue") +
+    geom_vline(data = median_hisp_only_im, aes(xintercept = median_wage), linetype = "dashed", color = "cornflowerblue") +
+    labs(title = "Immigrant log(Wages + 1) for Hispanics",
+         x = "log(Wages + 1)",
+         y = "Density (Proportion)") +
+    ylim(0, 0.6)
 
 # Combine plots side by side
-library(gridExtra)
-grid.arrange(density_plot_rac1p, density_plot_rac1p2, density_plot_hisp, density_plot_hisp2,density_plot_hisp3, ncol = 2, nrow = 3)
+grid.arrange(density_plot_rac1p, density_plot_rac1p2, density_plot_hisp, density_plot_hisp2, density_plot_hisp3, ncol = 2, nrow = 3)
 ```
+
 
 ### HISP model 1 for immigrants by POBP
 
-```{r}
-model3 = lm(WAGP ~ as.factor(RAC1P) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + PAP + HINS4 + as.factor(MAR) + as.factor(POBP), data = hisp_only_im)
+```{r, eval=FALSE}
+model3 = lm(WAGP ~ as.factor(RAC1P) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + PAP + HINS4 + as.factor(MAR) + as.factor(POBP) + Years_in_US, data = hisp_only_im)
 ```
 
-```{r}
+```{r, eval=FALSE}
 # Get the summary of the model
 summary_model <- summary(model3)
 
@@ -1115,7 +1326,7 @@ summary_model
 
 ### mini model and summary
 ```{r}
-mini_model = lm(WAGP ~  as.factor(RAC1P) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + PAP + HINS4 + as.factor(MAR) + as.factor(POBP), data = hisp_only_im)
+mini_model = lm(WAGP ~  as.factor(RAC1P) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + PAP + HINS4 + as.factor(MAR) + as.factor(POBP) + Years_in_US, data = hisp_only_im)
 ```
 
 ```{r}
@@ -1198,7 +1409,33 @@ rownames(results) <- names(orig_coefficients)
 # Display results
 print(results)
 ```
+### coef plot 
 
+```{r}
+# Prepare data for plotting
+plot_data <- data.frame(
+    Feature = rownames(results),
+    Coefficient = results$orig_coefficients,
+    SE = results$ehw_se,
+    Significance = results$stars
+)
+plot_data <- plot_data[order(plot_data$Coefficient), ]
+plot_data$Feature <- factor(plot_data$Feature, levels = plot_data$Feature)
+```
+
+```{r}
+
+# Plot using ggplot
+ggplot(plot_data, aes(x = Feature, y = Coefficient)) +
+    geom_point(aes(color = Significance), alpha = 0.5) +
+    geom_errorbar(aes(ymin = Coefficient - SE, ymax = Coefficient + SE, color = Significance), width = 0.6)  +
+    coord_flip() +
+    labs(title = "Coefficient Plot with EHW Robust Standard Errors",
+         subtitle = "Model (5): all Hispanic Immigrants",
+         x = "Feature",
+         y = "Coefficient") +
+    theme_minimal() + theme(axis.text.y = element_text(size = 8))
+```
 ### box plots 5 and 6
 ```{r}
 # Plot
@@ -1217,7 +1454,7 @@ grid.arrange(boxplot5, boxplot6, ncol = 2)
 ### HISP model 2 for all hispanics using immigrant for comparison
 
 ```{r}
-model2.2 = lm(WAGP ~ as.factor(RAC1P) + AGEP + SEX*immigrant + as.factor(ENG) + SEX*DIS + Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + PAP + HINS4 + as.factor(MAR), data = hisp_only)
+model2.2 = lm(WAGP ~ as.factor(RAC1P) + AGEP + SEX*immigrant + as.factor(ENG) + SEX*DIS + Unemployed + wb50birth+ as.factor(ST) + High_School_Grad + Bachelors_Degree + PAP + HINS4 + as.factor(MAR), data = hisp_only)
 ```
 
 ```{r}
@@ -1300,7 +1537,31 @@ rownames(results) <- names(orig_coefficients)
 print(results)
 ```
 
+```{r}
+# Prepare data for plotting
+plot_data <- data.frame(
+    Feature = rownames(results),
+    Coefficient = results$orig_coefficients,
+    SE = results$ehw_se,
+    Significance = results$stars
+)
+plot_data <- plot_data[order(plot_data$Coefficient), ]
+plot_data$Feature <- factor(plot_data$Feature, levels = plot_data$Feature)
+```
 
+```{r}
+
+# Plot using ggplot
+ggplot(plot_data, aes(x = Feature, y = Coefficient)) +
+    geom_point(aes(color = Significance), alpha = 0.5) +
+    geom_errorbar(aes(ymin = Coefficient - SE, ymax = Coefficient + SE, color = Significance), width = 0.6)  +
+    coord_flip() +
+    labs(title = "Coefficient Plot with EHW Robust Standard Errors",
+         subtitle = "Model (6): all Hispanics",
+         x = "Feature",
+         y = "Coefficient") +
+    theme_minimal() + theme(axis.text.y = element_text(size = 8))
+```
 
 
 
