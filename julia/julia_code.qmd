@@ -254,7 +254,7 @@ non_immigrants = processed_data2%>%filter(immigrant==0, RAC1P%in%c(1,2,6,8,9))
 
 ```{r}
 a <- ggplot(processed_data2,aes(x = WAGP, y = ..density..)) + geom_density(color = 'cyan3', fill = 'cyan3', alpha = 0.5) + 
-  labs(titles = "Distribution of Wages", x = "Wages Made in Last 12 Months")+ geom_vline(aes(xintercept=median(WAGP)),
+  labs(titles = "Distribution of Wages", x = "Wages Made in Last 12 Months", y = "Density (Proportion)")+ geom_vline(aes(xintercept=median(WAGP)),
             color="cyan3", linetype="dashed", linewidth=0.5, alpha = 0.5)
 ```
 
@@ -292,9 +292,10 @@ wagerace <- ggplot(processed_data2 %>% filter(RAC1P %in% c(1, 2, 6, 8, 9)),
   geom_vline(data = median_data_race, aes(xintercept = median_wage, color = factor(RAC1P)), 
              linetype = "dashed", linewidth = 0.5, alpha = 0.5) +
   facet_wrap(vars(factor(Citizen))) +
-  labs(title = "Distribution of Wages by Race, Faceted by Citizenship Status",
+  labs(title = "Distribution of Wages by Race", subtitle = "Faceted by Citizenship Status",
        x = "Wages Made in Last 12 Months",
-       y = "Density (Proportion)") +
+       y = "Density (Proportion)",
+       color = "Race", fill = "Race") +
   theme_minimal()+
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
@@ -311,9 +312,11 @@ wagerace2 <- ggplot(processed_data2 %>% filter(RAC1P %in% c(1, 2, 6)),
   geom_vline(data = median_data_race, aes(xintercept = median_wage, color = factor(RAC1P)), 
              linetype = "dashed", linewidth = 0.5, alpha = 0.5) +
   facet_wrap(vars(factor(Citizen))) +
-  labs(title = "Distribution of Wages by 3 Races, Faceted by Citizenship Status",
+  labs(title = "Distribution of Wages by 3 Races", subtitle = "Faceted by Citizenship Status",
        x = "Wages Made in Last 12 Months",
-       y = "Density (Proportion)") +
+       y = "Density (Proportion)",
+       fill = "Race",
+       color = "Race") +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
@@ -329,7 +332,8 @@ loga <- ggplot(processed_data2, aes(x = log(WAGP + 1), y = ..density..)) +
   geom_density(color = 'cyan3', fill = 'cyan3', alpha = 0.5) + 
   geom_vline(xintercept = median_log_wage, linetype = "dashed", linewidth = 0.5, alpha = 0.5) +
   labs(title = "Distribution of log(Wages + 1)", 
-       x = "log(Wages + 1) Made in Last 12 Months")
+       x = "log(Wages + 1) Made in Last 12 Months", 
+       y = "Density (Proportion)")
 
 ```
 
@@ -364,9 +368,11 @@ logwagerace <- ggplot(processed_data2 %>% filter(RAC1P %in% c(1, 2, 6, 8, 9)),
   geom_vline(data = median_data_race, aes(xintercept = median_log_wage, color = factor(RAC1P)), 
              linetype = "dashed", linewidth = 0.5, alpha = 0.5) +
   facet_wrap(vars(factor(Citizen))) +
-  labs(title = "Distribution of log(Wages + 1) by Race, Faceted by Citizenship Status",
+  labs(title = "Distribution of log(Wages + 1) by Race", subtitle = "Faceted by Citizenship Status",
        x = "log(Wages + 1) Made in Last 12 Months",
-       y = "Density (Proportion)") +
+       y = "Density (Proportion)",
+       fill = "Race",
+       color = "Race") +
   theme_minimal()+
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
@@ -385,9 +391,11 @@ logwagerace2 <- ggplot(processed_data2 %>% filter(RAC1P %in% c(1, 2, 6)),
   geom_vline(data = median_data_race, aes(xintercept = median_log_wage, color = factor(RAC1P)), 
              linetype = "dashed", linewidth = 0.5, alpha = 0.5) +
   facet_wrap(vars(factor(Citizen))) +
-  labs(title = "Distribution of log(Wages + 1) by 3 Races, Faceted by Citizenship Status",
+  labs(title = "Distribution of log(Wages + 1) by 3 Races", subtitle = "Faceted by Citizenship Status",
        x = "log(Wages + 1) Made in Last 12 Months",
-       y = "Density (Proportion)") +
+       y = "Density (Proportion)",
+       fill = "Race",
+       color = "Race") +
   theme_minimal()+
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
 ```
@@ -432,7 +440,8 @@ cor_matrix <- cor(processed_data_transformed, use = "complete.obs")
 ```{r}
 # Plot the correlation matrix with colors
 corrplot(cor_matrix, method = "color",
-         addCoef.col = 'black', tl.cex = 0.45, number.cex = 0.4)
+         addCoef.col = 'black', tl.cex = 0.45,
+         number.cex = 0.4)
 ```
 
 
@@ -558,7 +567,7 @@ ggplot(plot_data, aes(x = Feature, y = Coefficient)) +
 
 ```{r}
 # produce residual vs. fitted plot 
-plot(fitted(mini_model), resid(mini_model)) 
+plot(fitted(mini_model), resid(mini_model), main = "Residual Plot: Model (1)", xlab = "Fitted Values", ylab = "Residual Values") 
   
 # add a horizontal line at 0  
 abline(0,0) 
@@ -566,8 +575,13 @@ abline(0,0)
 
 ### qqplot
 ```{r}
-qqnorm(resid(mini_model))
-qqline(resid(mini_model))
+mini_model_plotting = lm(log(WAGP+1) ~ as.factor(RAC1P) + AGEP +  SEX*Citizen + as.factor(ENG) + SEX*DIS + Unemployed  + wb50birth + as.factor(ST) + High_School_Grad  + Bachelors_Degree + HISP_dummy + PAP + HINS4 + as.factor(MAR), data = processed_data2)
+```
+```{r}
+qqnorm(resid(mini_model_plotting), main = "QQ-plot of residuals")
+qqline(resid(mini_model_plotting))
+mtext("Model (1) with Log-transformed Wage", side = 3, line = 0.5, cex = 0.8)
+
 ```
 ### model0 and summary
 
@@ -600,11 +614,13 @@ summary_model
 boxplot1<- ggplot(processed_data2%>%filter(RAC1P %in% c(1,2,6)), aes(x = factor(RAC1P),
                                                     y = WAGP,
                                                     color = factor(RAC1P))) +
-  geom_boxplot() +labs(x = "Racial Group", y = "Wages in YTD") + theme_minimal()
-boxplot2 <-  ggplot(processed_data2%>%filter(RAC1P %in% c(1,2,6)), aes(x = factor(RAC1P),
-                                                    y = log(WAGP + 1),
-                                                    color = factor(RAC1P))) +
-  geom_boxplot() +labs(x = "Racial Group", y = "Wages in YTD") + theme_minimal()
+  geom_boxplot() +labs(x = "Racial Group", y = "Wages in the last 12 Months", title = "Boxplot of Wages by Race", color= "Race") + theme_minimal()
+boxplot2 <-  ggplot(processed_data2%>%
+                      filter(RAC1P %in% c(1,2,6)),
+                    aes(x = factor(RAC1P),
+                        y = log(WAGP + 1),
+                        color = factor(RAC1P))) +
+  geom_boxplot() +labs(x = "Racial Group", y = "log(Wage + 1) in the last 12 Months", title = "Boxplot of log(Wage + 1) by Race", color= "Race") + theme_minimal()  
 grid.arrange(boxplot1, boxplot2, ncol = 2)
 ```
 
@@ -714,7 +730,7 @@ ggplot(plot_data, aes(x = Feature, y = Coefficient)) +
     geom_errorbar(aes(ymin = Coefficient - SE, ymax = Coefficient + SE, color = Significance), width = 0.6)  +
     coord_flip() +
     labs(title = "Coefficient Plot with EHW Robust Standard Errors",
-         subtitle = "Model (2): all Immigrants",
+         subtitle = "Model (3): all Immigrants",
          x = "Feature",
          y = "Coefficient") +
     theme_minimal() + theme(axis.text.y = element_text(size = 8))
@@ -849,7 +865,7 @@ ggplot(plot_data, aes(x = Feature, y = Coefficient)) +
     geom_errorbar(aes(ymin = Coefficient - SE, ymax = Coefficient + SE, color = Significance), width = 0.6)  +
     coord_flip() +
     labs(title = "Coefficient Plot with EHW Robust Standard Errors",
-         subtitle = "Model (1.2): all non-Immigrants",
+         subtitle = "Model (2): all non-Immigrants",
          x = "Feature",
          y = "Coefficient") +
     theme_minimal() + theme(axis.text.y = element_text(size = 8))
@@ -1079,7 +1095,7 @@ ggplot(plot_data, aes(x = Feature, y = Coefficient)) +
     geom_errorbar(aes(ymin = Coefficient - SE, ymax = Coefficient + SE, color = Significance), width = 0.6)  +
     coord_flip() +
     labs(title = "Coefficient Plot with EHW Robust Standard Errors",
-         subtitle = "Model (3): all Asian Immigrants",
+         subtitle = "Model (4): all Asian Immigrants",
          x = "Feature",
          y = "Coefficient") +
     theme_minimal() + theme(axis.text.y = element_text(size = 8))
@@ -1090,11 +1106,11 @@ ggplot(plot_data, aes(x = Feature, y = Coefficient)) +
 boxplot3<- ggplot(asian_only_im, aes(x = factor(POBP),
                                                     y = WAGP,
                                                     color = factor(POBP))) +
-  geom_boxplot() +labs(x = "Place of Birth", y = "Wages in YTD") + theme_minimal()
+  geom_boxplot() +labs(x = "Place of Birth", y = "Wages in the last 12 Months", title = "Boxplot of Wages by Place of Birth", color= "Place of Birth") + theme_minimal()
 boxplot4 <-  ggplot(asian_only_im, aes(x = factor(POBP),
                                                     y = log(WAGP + 1),
                                                     color = factor(POBP))) +
-  geom_boxplot() +labs(x = "Place of Birth", y = "Wages in YTD") + theme_minimal()
+  geom_boxplot() +labs(x = "Place of Birth", y = "log(Wage + 1) in the last 12 Months", title = "Boxplot of log(Wage + 1) by Place of Birth", color= "Place of Birth") + theme_minimal()
 grid.arrange(boxplot3, boxplot4, ncol = 2)
 ```
 
@@ -1203,7 +1219,7 @@ ggplot(plot_data, aes(x = Feature, y = Coefficient)) +
     geom_errorbar(aes(ymin = Coefficient - SE, ymax = Coefficient + SE, color = Significance), width = 0.6)  +
     coord_flip() +
     labs(title = "Coefficient Plot with EHW Robust Standard Errors",
-         subtitle = "Model (4): all Asians",
+         subtitle = "Model (5): all Asians",
          x = "Feature",
          y = "Coefficient") +
     theme_minimal() + theme(axis.text.y = element_text(size = 8))
@@ -1266,7 +1282,9 @@ density_plot_rac1p <- ggplot(hisp_only_im, aes(x = log(WAGP + 1), fill = factor(
     geom_vline(data = median_rac1p_immigrants, aes(xintercept = median_wage, color = factor(RAC1P)), linetype = "dashed") +
     labs(title = "Hispanic Immigrant log(Wages + 1) by Race",
          x = "log(Wages + 1)",
-         y = "Density (Proportion)") +
+         y = "Density (Proportion)", 
+         color = "Race", 
+         fill = "Race") +
     ylim(0, 0.6)
 
 # Create density plot for RAC1P groups (non-immigrants)
@@ -1275,7 +1293,9 @@ density_plot_rac1p2 <- ggplot(hisp_only %>% filter(immigrant == 0), aes(x = log(
     geom_vline(data = median_rac1p_nonimmigrants, aes(xintercept = median_wage, color = factor(RAC1P)), linetype = "dashed") +
     labs(title = "non-Immigrant Hispanic log(Wages + 1) by Race",
          x = "log(Wages + 1)",
-         y = "Density (Proportion)") +
+         y = "Density (Proportion)", 
+         color = "Race", 
+         fill = "Race") +
     ylim(0, 0.6)
 
 # Create density plot for Hispanic immigrants by country of origin
@@ -1284,7 +1304,9 @@ density_plot_hisp <- ggplot(hisp_only_im, aes(x = log(WAGP + 1), fill = factor(P
     geom_vline(data = median_hisp_immigrants, aes(xintercept = median_wage, color = factor(POBP)), linetype = "dashed") +
     labs(title = "log(Wages + 1) for Hispanics by Place of Birth",
          x = "log(Wages + 1)",
-         y = "Density (Proportion)") +
+         y = "Density (Proportion)", 
+         color = "Place of Birth", 
+         fill = "Place of Birth") +
     ylim(0, 0.6)
 
 # Create density plot for Hispanic non-immigrants
@@ -1435,22 +1457,25 @@ ggplot(plot_data, aes(x = Feature, y = Coefficient)) +
     geom_errorbar(aes(ymin = Coefficient - SE, ymax = Coefficient + SE, color = Significance), width = 0.6)  +
     coord_flip() +
     labs(title = "Coefficient Plot with EHW Robust Standard Errors",
-         subtitle = "Model (5): all Hispanic Immigrants",
+         subtitle = "Model (6): all Hispanic Immigrants",
          x = "Feature",
          y = "Coefficient") +
     theme_minimal() + theme(axis.text.y = element_text(size = 8))
 ```
 ### box plots 5 and 6
 ```{r}
+
 # Plot
 boxplot5<- ggplot(hisp_only_im, aes(x = factor(POBP),
                                                     y = WAGP,
                                                     color = factor(POBP))) +
-  geom_boxplot() +labs(x = "Place of Birth", y = "Wages in YTD") + theme_minimal()
+  geom_boxplot() +labs(x = "Place of Birth", y = "Wages in the last 12 Months", title = "Boxplot of Wages by Place of Birth", color= "Place of Birth"
+) + theme_minimal()
 boxplot6 <-  ggplot(hisp_only_im, aes(x = factor(POBP),
                                                     y = log(WAGP + 1),
                                                     color = factor(POBP))) +
-  geom_boxplot() +labs(x = "Place of Birth", y = "Wages in YTD") + theme_minimal()
+  geom_boxplot() +labs(x = "Place of Birth", y = "log(Wage + 1) in the last 12 Months", title = "Boxplot of log(Wage + 1) by Place of Birth", color= "Place of Birth"
+) + theme_minimal()
 grid.arrange(boxplot5, boxplot6, ncol = 2)
 ```
 
@@ -1561,7 +1586,7 @@ ggplot(plot_data, aes(x = Feature, y = Coefficient)) +
     geom_errorbar(aes(ymin = Coefficient - SE, ymax = Coefficient + SE, color = Significance), width = 0.6)  +
     coord_flip() +
     labs(title = "Coefficient Plot with EHW Robust Standard Errors",
-         subtitle = "Model (6): all Hispanics",
+         subtitle = "Model (7): all Hispanics",
          x = "Feature",
          y = "Coefficient") +
     theme_minimal() + theme(axis.text.y = element_text(size = 8))
