@@ -92,6 +92,50 @@ processed_data2 <- processed_data2%>%mutate(white_dummy = (RAC1P == 1),
 ```
 
 
+EDA
+```{r}
+library(ggplot2)
+library(gridExtra)
+library(scales)
+
+processed_data2$PAP_binary = as.numeric(processed_data2$PAP > 0)
+
+generate_and_save_plots <- function(data, variable, file_name) {
+  base_plot <- ggplot(data, aes_string(x = variable, y = "..prop..", group = "1")) +
+    geom_bar(aes(y = ..prop..), stat = "count", fill = "gray") +
+    scale_y_continuous(labels = percent_format()) +
+    geom_text(stat = "count", aes(label = percent(..prop..), y = ..prop..), 
+              vjust = -0.5, position = position_stack(vjust = 0.5))
+
+  p1 <- base_plot +
+    labs(title = paste("General Distribution of", variable), x = variable, y = "Proportion")
+  
+  p2 <- base_plot +
+    facet_grid(. ~ Citizen) +
+    labs(title = paste("Distribution of", variable, "by Citizen Status"), x = variable, y = "Proportion")
+  
+  p3 <- base_plot +
+    facet_grid(. ~ immigrant) +
+    labs(title = paste("Distribution of", variable, "by Immigrant Status"), x = variable, y = "Proportion")
+
+  p4 <- base_plot +
+    facet_grid(. ~ asian_dummy) +
+    labs(title = paste("Distribution of", variable, "by Asian identification"), x = variable, y = "Proportion")
+
+  p5 <- base_plot +
+    facet_grid(. ~ HISP_dummy) +
+    labs(title = paste("Distribution of", variable, "by Hispanic identification"), x = variable, y = "Proportion")
+  
+  combined_plot <- grid.arrange(p1, p2, p3, p4, p5, ncol = 1)
+  
+  ggsave(file_name, combined_plot, width = 8, height = 30)  # Adjusted height to accommodate more plots
+}
+
+generate_and_save_plots(processed_data2, "PAP_binary", "plots_PAP_binary.png")
+generate_and_save_plots(processed_data2, "HINS4", "plots_HINS4.png")
+generate_and_save_plots(processed_data2, "Unemployed", "plots_Unemployed.png")
+```
+
 ```{r}
 immigrants_only = processed_data2%>%filter(CIT%in% c(4,5))
 immigrants_only2 = immigrants_only%>%filter(RAC1P%in%c(1,2,6,8,9))
@@ -958,46 +1002,4 @@ ggplot(results, aes(x = Feature, y = Coefficient)) +
        x = "Feature",
        y = "Coefficient") +
   theme_minimal() + theme(axis.text.y = element_text(size = 8))
-```
-
-EDA
-```{r}
-library(ggplot2)
-library(gridExtra)
-library(scales)
-
-generate_and_save_plots <- function(data, variable, file_name) {
-  base_plot <- ggplot(data, aes_string(x = variable, y = "..prop..", group = "1")) +
-    geom_bar(aes(y = ..prop..), stat = "count", fill = "gray") +
-    scale_y_continuous(labels = percent_format()) +
-    geom_text(stat = "count", aes(label = percent(..prop..), y = ..prop..), 
-              vjust = -0.5, position = position_stack(vjust = 0.5))
-
-  p1 <- base_plot +
-    labs(title = paste("General Distribution of", variable), x = variable, y = "Proportion")
-  
-  p2 <- base_plot +
-    facet_grid(. ~ Citizen) +
-    labs(title = paste("Distribution of", variable, "by Citizen Status"), x = variable, y = "Proportion")
-  
-  p3 <- base_plot +
-    facet_grid(. ~ immigrant) +
-    labs(title = paste("Distribution of", variable, "by Immigrant Status"), x = variable, y = "Proportion")
-
-  p4 <- base_plot +
-    facet_grid(. ~ asian_dummy) +
-    labs(title = paste("Distribution of", variable, "by Asian identification"), x = variable, y = "Proportion")
-
-  p5 <- base_plot +
-    facet_grid(. ~ HISP_dummy) +
-    labs(title = paste("Distribution of", variable, "by Hispanic identification"), x = variable, y = "Proportion")
-  
-  combined_plot <- grid.arrange(p1, p2, p3, p4, p5, ncol = 1)
-  
-  ggsave(file_name, combined_plot, width = 8, height = 30)  # Adjusted height to accommodate more plots
-}
-
-generate_and_save_plots(processed_data2, "PAP_binary", "plots_PAP_binary.png")
-generate_and_save_plots(processed_data2, "HINS4", "plots_HINS4.png")
-generate_and_save_plots(processed_data2, "Unemployed", "plots_Unemployed.png")
 ```
