@@ -1,5 +1,5 @@
 ---
-title: "Ezequiel_markdown"
+title: "230A - Group Project"
 output: pdf_document
 date: "2024-04-29"
 ---
@@ -12,7 +12,6 @@ generate some variables we need
 if (!require("readr")) install.packages("readr", dependencies = TRUE)
 library(readr)
 
-# We append population a, b, c,d  data once
 data_a <- read.csv("/Users/zequi/Desktop/Berkeley/230A/csv_pus/psam_pusa.csv")
 data_b <- read.csv("/Users/zequi/Desktop/Berkeley/230A/csv_pus/psam_pusb.csv")
 data <- rbind(data_a, data_b)
@@ -56,18 +55,6 @@ csv_file_inside_zip <- "processed_data.csv"
 processed_data <- read.csv(unzip(zip_file_path, files = csv_file_inside_zip))
 ```
 
-```{r}
-library(gridExtra)
-library(MASS)
-library(sandwich)
-library(knitr)
-
-compute_ehw_se <- function(model) {
-  robust_se <- sqrt(diag(vcovHC(model, type = "HC1")))
-  return(robust_se)
-}
-```
-
 We do some extra processing:
 ```{r}
 library(tidyr)
@@ -96,13 +83,9 @@ processed_data = processed_data%>%mutate(immigrant = CIT%in%c(4,5))
 
 ```{r}
 processed_data2 = processed_data%>%filter(!(WAGP == 0 & Unemployed == 0))
-```
 
-```{r}
 processed_data2 = processed_data2%>%mutate(immigrant = as.integer(CIT%in%c(4,5)))
-```
 
-```{r}
 processed_data2 <- processed_data2%>%mutate(white_dummy = (RAC1P == 1),
                          asian_dummy = (RAC1P == 6),
                          black_dummy = (RAC1P == 2))
@@ -112,10 +95,20 @@ processed_data2 <- processed_data2%>%mutate(white_dummy = (RAC1P == 1),
 ```{r}
 immigrants_only = processed_data2%>%filter(CIT%in% c(4,5))
 immigrants_only2 = immigrants_only%>%filter(RAC1P%in%c(1,2,6,8,9))
+non_immigrants = processed_data2%>%filter(immigrant==1, RAC1P%in%c(1,2,6,8,9))
 ```
 
+We will use this later to calculate robust se:
 ```{r}
-non_immigrants = processed_data2%>%filter(immigrant==1, RAC1P%in%c(1,2,6,8,9))
+library(gridExtra)
+library(MASS)
+library(sandwich)
+library(knitr)
+
+compute_ehw_se <- function(model) {
+  robust_se <- sqrt(diag(vcovHC(model, type = "HC1")))
+  return(robust_se)
+}
 ```
 
 Logistics regression: Predict Employment status
@@ -132,30 +125,24 @@ orig_coefficients <- coef(model)
 
 ehw_se <- sqrt(diag(vcovHC(model, type = "HC0")))
 
-# Get summary and filter out state coefficients
 summary_model <- summary(model)
 state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
 filtered_coefficients <- summary_model$coefficients[!state_rows, ]
 
-# Convert the matrix to a data frame for further manipulation
 coeff_df <- as.data.frame(filtered_coefficients)
 
-# Add robust z-values and p-values
 coeff_df$Robust_z_value <- coeff_df$Estimate / ehw_se[!state_rows]
 coeff_df$Robust_Pr <- 2 * pnorm(abs(coeff_df$Robust_z_value), lower.tail = FALSE)
 
-# Assign significance stars based on the robust p-values
 coeff_df$Signif_Stars <- ifelse(coeff_df$Robust_Pr < 0.001, "***", 
                                 ifelse(coeff_df$Robust_Pr < 0.01, "**", 
                                        ifelse(coeff_df$Robust_Pr < 0.05, "*", 
                                               ifelse(coeff_df$Robust_Pr < 0.1, ".", ""))))
 
-# Printing the formatted summary
 print(coeff_df, digits=3)
 ```
 ```{r}
 library(ggplot2)
-# Data frame for results
 results <- data.frame(
   Coefficient = coeff_df$Estimate,
   SE = ehw_se[!state_rows],
@@ -163,11 +150,9 @@ results <- data.frame(
 )
 rownames(results) <- rownames(coeff_df)
 
-# Prepare for plotting
 results <- results[order(results$Coefficient), ]
 results$Feature <- factor(rownames(results), levels = rownames(results))
 
-# Plot
 ggplot(results, aes(x = Feature, y = Coefficient)) +
   geom_point(aes(color = Significance), alpha = 0.5) +
   geom_errorbar(aes(ymin = Coefficient - SE, ymax = Coefficient + SE, color = Significance), width = 0.2) +
@@ -183,8 +168,6 @@ Logistics regression: Risk of poverty
 ```{r}
 processed_data2$PAP_binary = as.numeric(processed_data2$PAP > 0)
 poverty_risk_model <- glm(PAP_binary ~ as.factor(RAC1P) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + HISP_dummy + as.factor(MAR), family = binomial(), data = processed_data2)
-#summary(poverty_risk_model)
-
 summary_model <- summary(poverty_risk_model)
 ```
 
@@ -195,29 +178,23 @@ orig_coefficients <- coef(model)
 
 ehw_se <- sqrt(diag(vcovHC(model, type = "HC0")))
 
-# Get summary and filter out state coefficients
 summary_model <- summary(model)
 state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
 filtered_coefficients <- summary_model$coefficients[!state_rows, ]
 
-# Convert the matrix to a data frame for further manipulation
 coeff_df <- as.data.frame(filtered_coefficients)
 
-# Add robust z-values and p-values
 coeff_df$Robust_z_value <- coeff_df$Estimate / ehw_se[!state_rows]
 coeff_df$Robust_Pr <- 2 * pnorm(abs(coeff_df$Robust_z_value), lower.tail = FALSE)
 
-# Assign significance stars based on the robust p-values
 coeff_df$Signif_Stars <- ifelse(coeff_df$Robust_Pr < 0.001, "***", 
                                 ifelse(coeff_df$Robust_Pr < 0.01, "**", 
                                        ifelse(coeff_df$Robust_Pr < 0.05, "*", 
                                               ifelse(coeff_df$Robust_Pr < 0.1, ".", ""))))
 
-# Printing the formatted summary
 print(coeff_df, digits=3)
 ```
 ```{r}
-# Data frame for results
 results <- data.frame(
   Coefficient = coeff_df$Estimate,
   SE = ehw_se[!state_rows],
@@ -225,11 +202,9 @@ results <- data.frame(
 )
 rownames(results) <- rownames(coeff_df)
 
-# Prepare for plotting
 results <- results[order(results$Coefficient), ]
 results$Feature <- factor(rownames(results), levels = rownames(results))
 
-# Plot
 ggplot(results, aes(x = Feature, y = Coefficient)) +
   geom_point(aes(color = Significance), alpha = 0.5) +
   geom_errorbar(aes(ymin = Coefficient - SE, ymax = Coefficient + SE, color = Significance), width = 0.2) +
@@ -244,7 +219,6 @@ ggplot(results, aes(x = Feature, y = Coefficient)) +
 Logistics regression: Probability of being on medicaid (HINS4)
 ```{r}
 medicaid_model <- glm(HINS4 ~ as.factor(RAC1P) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + HISP_dummy + as.factor(MAR), family = binomial(), data = processed_data2)
-#summary(medicaid_model)
 
 summary_model <- summary(medicaid_model)
 state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
@@ -259,29 +233,23 @@ orig_coefficients <- coef(model)
 
 ehw_se <- sqrt(diag(vcovHC(model, type = "HC0")))
 
-# Get summary and filter out state coefficients
 summary_model <- summary(model)
 state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
 filtered_coefficients <- summary_model$coefficients[!state_rows, ]
 
-# Convert the matrix to a data frame for further manipulation
 coeff_df <- as.data.frame(filtered_coefficients)
 
-# Add robust z-values and p-values
 coeff_df$Robust_z_value <- coeff_df$Estimate / ehw_se[!state_rows]
 coeff_df$Robust_Pr <- 2 * pnorm(abs(coeff_df$Robust_z_value), lower.tail = FALSE)
 
-# Assign significance stars based on the robust p-values
 coeff_df$Signif_Stars <- ifelse(coeff_df$Robust_Pr < 0.001, "***", 
                                 ifelse(coeff_df$Robust_Pr < 0.01, "**", 
                                        ifelse(coeff_df$Robust_Pr < 0.05, "*", 
                                               ifelse(coeff_df$Robust_Pr < 0.1, ".", ""))))
 
-# Printing the formatted summary
 print(coeff_df, digits=3)
 ```
 ```{r}
-# Data frame for results
 results <- data.frame(
   Coefficient = coeff_df$Estimate,
   SE = ehw_se[!state_rows],
@@ -289,11 +257,9 @@ results <- data.frame(
 )
 rownames(results) <- rownames(coeff_df)
 
-# Prepare for plotting
 results <- results[order(results$Coefficient), ]
 results$Feature <- factor(rownames(results), levels = rownames(results))
 
-# Plot
 ggplot(results, aes(x = Feature, y = Coefficient)) +
   geom_point(aes(color = Significance), alpha = 0.5) +
   geom_errorbar(aes(ymin = Coefficient - SE, ymax = Coefficient + SE, color = Significance), width = 0.2) +
@@ -305,7 +271,7 @@ ggplot(results, aes(x = Feature, y = Coefficient)) +
   theme_minimal() + theme(axis.text.y = element_text(size = 8))
 ```
 
-Repeat the exercise for top Hispanic origins
+Repeat the exercise for leading Hispanic origins
 ```{r}
 hisp_only = processed_data2%>%filter(HISP_dummy==1)
 hisp_only_im = immigrants_only2%>%filter(HISP_dummy==1)
@@ -323,7 +289,6 @@ hisp_only_im = hisp_only_im%>%filter(POBP %in% largest_subgroup)
 ```
 
 Hispanic immigrants
-
 ```{r}
 imm_hisp_only_employment_status_model <- glm(Unemployed ~  as.factor(POBP) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth + as.factor(ST) + High_School_Grad + Bachelors_Degree + as.factor(MAR), data = hisp_only_im, family = binomial())
 summary_model <- summary(imm_hisp_only_employment_status_model)
@@ -340,29 +305,23 @@ orig_coefficients <- coef(model)
 
 ehw_se <- sqrt(diag(vcovHC(model, type = "HC0")))
 
-# Get summary and filter out state coefficients
 summary_model <- summary(model)
 state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
 filtered_coefficients <- summary_model$coefficients[!state_rows, ]
 
-# Convert the matrix to a data frame for further manipulation
 coeff_df <- as.data.frame(filtered_coefficients)
 
-# Add robust z-values and p-values
 coeff_df$Robust_z_value <- coeff_df$Estimate / ehw_se[!state_rows]
 coeff_df$Robust_Pr <- 2 * pnorm(abs(coeff_df$Robust_z_value), lower.tail = FALSE)
 
-# Assign significance stars based on the robust p-values
 coeff_df$Signif_Stars <- ifelse(coeff_df$Robust_Pr < 0.001, "***", 
                                 ifelse(coeff_df$Robust_Pr < 0.01, "**", 
                                        ifelse(coeff_df$Robust_Pr < 0.05, "*", 
                                               ifelse(coeff_df$Robust_Pr < 0.1, ".", ""))))
 
-# Printing the formatted summary
 print(coeff_df, digits=3)
 ```
 ```{r}
-# Data frame for results
 results <- data.frame(
   Coefficient = coeff_df$Estimate,
   SE = ehw_se[!state_rows],
@@ -370,11 +329,9 @@ results <- data.frame(
 )
 rownames(results) <- rownames(coeff_df)
 
-# Prepare for plotting
 results <- results[order(results$Coefficient), ]
 results$Feature <- factor(rownames(results), levels = rownames(results))
 
-# Plot
 ggplot(results, aes(x = Feature, y = Coefficient)) +
   geom_point(aes(color = Significance), alpha = 0.5) +
   geom_errorbar(aes(ymin = Coefficient - SE, ymax = Coefficient + SE, color = Significance), width = 0.2) +
@@ -403,29 +360,23 @@ orig_coefficients <- coef(model)
 
 ehw_se <- sqrt(diag(vcovHC(model, type = "HC0")))
 
-# Get summary and filter out state coefficients
 summary_model <- summary(model)
 state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
 filtered_coefficients <- summary_model$coefficients[!state_rows, ]
 
-# Convert the matrix to a data frame for further manipulation
 coeff_df <- as.data.frame(filtered_coefficients)
 
-# Add robust z-values and p-values
 coeff_df$Robust_z_value <- coeff_df$Estimate / ehw_se[!state_rows]
 coeff_df$Robust_Pr <- 2 * pnorm(abs(coeff_df$Robust_z_value), lower.tail = FALSE)
 
-# Assign significance stars based on the robust p-values
 coeff_df$Signif_Stars <- ifelse(coeff_df$Robust_Pr < 0.001, "***", 
                                 ifelse(coeff_df$Robust_Pr < 0.01, "**", 
                                        ifelse(coeff_df$Robust_Pr < 0.05, "*", 
                                               ifelse(coeff_df$Robust_Pr < 0.1, ".", ""))))
 
-# Printing the formatted summary
 print(coeff_df, digits=3)
 ```
 ```{r}
-# Data frame for results
 results <- data.frame(
   Coefficient = coeff_df$Estimate,
   SE = ehw_se[!state_rows],
@@ -433,11 +384,9 @@ results <- data.frame(
 )
 rownames(results) <- rownames(coeff_df)
 
-# Prepare for plotting
 results <- results[order(results$Coefficient), ]
 results$Feature <- factor(rownames(results), levels = rownames(results))
 
-# Plot
 ggplot(results, aes(x = Feature, y = Coefficient)) +
   geom_point(aes(color = Significance), alpha = 0.5) +
   geom_errorbar(aes(ymin = Coefficient - SE, ymax = Coefficient + SE, color = Significance), width = 0.2) +
@@ -465,29 +414,23 @@ orig_coefficients <- coef(model)
 
 ehw_se <- sqrt(diag(vcovHC(model, type = "HC0")))
 
-# Get summary and filter out state coefficients
 summary_model <- summary(model)
 state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
 filtered_coefficients <- summary_model$coefficients[!state_rows, ]
 
-# Convert the matrix to a data frame for further manipulation
 coeff_df <- as.data.frame(filtered_coefficients)
 
-# Add robust z-values and p-values
 coeff_df$Robust_z_value <- coeff_df$Estimate / ehw_se[!state_rows]
 coeff_df$Robust_Pr <- 2 * pnorm(abs(coeff_df$Robust_z_value), lower.tail = FALSE)
 
-# Assign significance stars based on the robust p-values
 coeff_df$Signif_Stars <- ifelse(coeff_df$Robust_Pr < 0.001, "***", 
                                 ifelse(coeff_df$Robust_Pr < 0.01, "**", 
                                        ifelse(coeff_df$Robust_Pr < 0.05, "*", 
                                               ifelse(coeff_df$Robust_Pr < 0.1, ".", ""))))
 
-# Printing the formatted summary
 print(coeff_df, digits=3)
 ```
 ```{r}
-# Data frame for results
 results <- data.frame(
   Coefficient = coeff_df$Estimate,
   SE = ehw_se[!state_rows],
@@ -495,11 +438,9 @@ results <- data.frame(
 )
 rownames(results) <- rownames(coeff_df)
 
-# Prepare for plotting
 results <- results[order(results$Coefficient), ]
 results$Feature <- factor(rownames(results), levels = rownames(results))
 
-# Plot
 ggplot(results, aes(x = Feature, y = Coefficient)) +
   geom_point(aes(color = Significance), alpha = 0.5) +
   geom_errorbar(aes(ymin = Coefficient - SE, ymax = Coefficient + SE, color = Significance), width = 0.2) +
@@ -511,8 +452,7 @@ ggplot(results, aes(x = Feature, y = Coefficient)) +
   theme_minimal() + theme(axis.text.y = element_text(size = 8))
 ```
 
-Hispanics immigrants and native
-
+Hispanics immigrants and native-born:
 ```{r}
 hisp_only_employment_status_model <- glm(Unemployed ~ AGEP + SEX*immigrant + as.factor(ENG) + SEX*DIS + wb50birth + as.factor(ST) + High_School_Grad + Bachelors_Degree + as.factor(MAR), data = hisp_only, family = binomial())
 summary_model <- summary(hisp_only_employment_status_model)
@@ -529,29 +469,23 @@ orig_coefficients <- coef(model)
 
 ehw_se <- sqrt(diag(vcovHC(model, type = "HC0")))
 
-# Get summary and filter out state coefficients
 summary_model <- summary(model)
 state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
 filtered_coefficients <- summary_model$coefficients[!state_rows, ]
 
-# Convert the matrix to a data frame for further manipulation
 coeff_df <- as.data.frame(filtered_coefficients)
 
-# Add robust z-values and p-values
 coeff_df$Robust_z_value <- coeff_df$Estimate / ehw_se[!state_rows]
 coeff_df$Robust_Pr <- 2 * pnorm(abs(coeff_df$Robust_z_value), lower.tail = FALSE)
 
-# Assign significance stars based on the robust p-values
 coeff_df$Signif_Stars <- ifelse(coeff_df$Robust_Pr < 0.001, "***", 
                                 ifelse(coeff_df$Robust_Pr < 0.01, "**", 
                                        ifelse(coeff_df$Robust_Pr < 0.05, "*", 
                                               ifelse(coeff_df$Robust_Pr < 0.1, ".", ""))))
 
-# Printing the formatted summary
 print(coeff_df, digits=3)
 ```
 ```{r}
-# Data frame for results
 results <- data.frame(
   Coefficient = coeff_df$Estimate,
   SE = ehw_se[!state_rows],
@@ -559,11 +493,9 @@ results <- data.frame(
 )
 rownames(results) <- rownames(coeff_df)
 
-# Prepare for plotting
 results <- results[order(results$Coefficient), ]
 results$Feature <- factor(rownames(results), levels = rownames(results))
 
-# Plot
 ggplot(results, aes(x = Feature, y = Coefficient)) +
   geom_point(aes(color = Significance), alpha = 0.5) +
   geom_errorbar(aes(ymin = Coefficient - SE, ymax = Coefficient + SE, color = Significance), width = 0.2) +
@@ -591,29 +523,23 @@ orig_coefficients <- coef(model)
 
 ehw_se <- sqrt(diag(vcovHC(model, type = "HC0")))
 
-# Get summary and filter out state coefficients
 summary_model <- summary(model)
 state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
 filtered_coefficients <- summary_model$coefficients[!state_rows, ]
 
-# Convert the matrix to a data frame for further manipulation
 coeff_df <- as.data.frame(filtered_coefficients)
 
-# Add robust z-values and p-values
 coeff_df$Robust_z_value <- coeff_df$Estimate / ehw_se[!state_rows]
 coeff_df$Robust_Pr <- 2 * pnorm(abs(coeff_df$Robust_z_value), lower.tail = FALSE)
 
-# Assign significance stars based on the robust p-values
 coeff_df$Signif_Stars <- ifelse(coeff_df$Robust_Pr < 0.001, "***", 
                                 ifelse(coeff_df$Robust_Pr < 0.01, "**", 
                                        ifelse(coeff_df$Robust_Pr < 0.05, "*", 
                                               ifelse(coeff_df$Robust_Pr < 0.1, ".", ""))))
 
-# Printing the formatted summary
 print(coeff_df, digits=3)
 ```
 ```{r}
-# Data frame for results
 results <- data.frame(
   Coefficient = coeff_df$Estimate,
   SE = ehw_se[!state_rows],
@@ -621,11 +547,9 @@ results <- data.frame(
 )
 rownames(results) <- rownames(coeff_df)
 
-# Prepare for plotting
 results <- results[order(results$Coefficient), ]
 results$Feature <- factor(rownames(results), levels = rownames(results))
 
-# Plot
 ggplot(results, aes(x = Feature, y = Coefficient)) +
   geom_point(aes(color = Significance), alpha = 0.5) +
   geom_errorbar(aes(ymin = Coefficient - SE, ymax = Coefficient + SE, color = Significance), width = 0.2) +
@@ -653,29 +577,23 @@ orig_coefficients <- coef(model)
 
 ehw_se <- sqrt(diag(vcovHC(model, type = "HC0")))
 
-# Get summary and filter out state coefficients
 summary_model <- summary(model)
 state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
 filtered_coefficients <- summary_model$coefficients[!state_rows, ]
 
-# Convert the matrix to a data frame for further manipulation
 coeff_df <- as.data.frame(filtered_coefficients)
 
-# Add robust z-values and p-values
 coeff_df$Robust_z_value <- coeff_df$Estimate / ehw_se[!state_rows]
 coeff_df$Robust_Pr <- 2 * pnorm(abs(coeff_df$Robust_z_value), lower.tail = FALSE)
 
-# Assign significance stars based on the robust p-values
 coeff_df$Signif_Stars <- ifelse(coeff_df$Robust_Pr < 0.001, "***", 
                                 ifelse(coeff_df$Robust_Pr < 0.01, "**", 
                                        ifelse(coeff_df$Robust_Pr < 0.05, "*", 
                                               ifelse(coeff_df$Robust_Pr < 0.1, ".", ""))))
 
-# Printing the formatted summary
 print(coeff_df, digits=3)
 ```
 ```{r}
-# Data frame for results
 results <- data.frame(
   Coefficient = coeff_df$Estimate,
   SE = ehw_se[!state_rows],
@@ -683,11 +601,9 @@ results <- data.frame(
 )
 rownames(results) <- rownames(coeff_df)
 
-# Prepare for plotting
 results <- results[order(results$Coefficient), ]
 results$Feature <- factor(rownames(results), levels = rownames(results))
 
-# Plot
 ggplot(results, aes(x = Feature, y = Coefficient)) +
   geom_point(aes(color = Significance), alpha = 0.5) +
   geom_errorbar(aes(ymin = Coefficient - SE, ymax = Coefficient + SE, color = Significance), width = 0.2) +
@@ -699,7 +615,7 @@ ggplot(results, aes(x = Feature, y = Coefficient)) +
   theme_minimal() + theme(axis.text.y = element_text(size = 8))
 ```
 
-Repeat the exercise for top Asian origins
+Repeat the exercise for leading Asian origins
 ```{r}
 asian_only = processed_data2%>%filter(RAC1P==6)
 asian_only_im = immigrants_only2%>%filter(RAC1P==6)
@@ -733,30 +649,24 @@ orig_coefficients <- coef(model)
 
 ehw_se <- sqrt(diag(vcovHC(model, type = "HC0")))
 
-# Get summary and filter out state coefficients
 summary_model <- summary(model)
 state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
 filtered_coefficients <- summary_model$coefficients[!state_rows, ]
 
-# Convert the matrix to a data frame for further manipulation
 coeff_df <- as.data.frame(filtered_coefficients)
 
-# Add robust z-values and p-values
 coeff_df$Robust_z_value <- coeff_df$Estimate / ehw_se[!state_rows]
 coeff_df$Robust_Pr <- 2 * pnorm(abs(coeff_df$Robust_z_value), lower.tail = FALSE)
 
-# Assign significance stars based on the robust p-values
 coeff_df$Signif_Stars <- ifelse(coeff_df$Robust_Pr < 0.001, "***", 
                                 ifelse(coeff_df$Robust_Pr < 0.01, "**", 
                                        ifelse(coeff_df$Robust_Pr < 0.05, "*", 
                                               ifelse(coeff_df$Robust_Pr < 0.1, ".", ""))))
 
-# Printing the formatted summary
 print(coeff_df, digits=3)
 ```
 
 ```{r}
-# Data frame for results
 results <- data.frame(
   Coefficient = coeff_df$Estimate,
   SE = ehw_se[!state_rows],
@@ -764,11 +674,9 @@ results <- data.frame(
 )
 rownames(results) <- rownames(coeff_df)
 
-# Prepare for plotting
 results <- results[order(results$Coefficient), ]
 results$Feature <- factor(rownames(results), levels = rownames(results))
 
-# Plot
 ggplot(results, aes(x = Feature, y = Coefficient)) +
   geom_point(aes(color = Significance), alpha = 0.5) +
   geom_errorbar(aes(ymin = Coefficient - SE, ymax = Coefficient + SE, color = Significance), width = 0.2) +
@@ -779,7 +687,6 @@ ggplot(results, aes(x = Feature, y = Coefficient)) +
        y = "Coefficient") +
   theme_minimal() + theme(axis.text.y = element_text(size = 8))
 ```
-
 
 ```{r}
 asian_only_im$PAP_binary = as.numeric(asian_only_im$PAP > 0)
@@ -798,29 +705,23 @@ orig_coefficients <- coef(model)
 
 ehw_se <- sqrt(diag(vcovHC(model, type = "HC0")))
 
-# Get summary and filter out state coefficients
 summary_model <- summary(model)
 state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
 filtered_coefficients <- summary_model$coefficients[!state_rows, ]
 
-# Convert the matrix to a data frame for further manipulation
 coeff_df <- as.data.frame(filtered_coefficients)
 
-# Add robust z-values and p-values
 coeff_df$Robust_z_value <- coeff_df$Estimate / ehw_se[!state_rows]
 coeff_df$Robust_Pr <- 2 * pnorm(abs(coeff_df$Robust_z_value), lower.tail = FALSE)
 
-# Assign significance stars based on the robust p-values
 coeff_df$Signif_Stars <- ifelse(coeff_df$Robust_Pr < 0.001, "***", 
                                 ifelse(coeff_df$Robust_Pr < 0.01, "**", 
                                        ifelse(coeff_df$Robust_Pr < 0.05, "*", 
                                               ifelse(coeff_df$Robust_Pr < 0.1, ".", ""))))
 
-# Printing the formatted summary
 print(coeff_df, digits=3)
 ```
 ```{r}
-# Data frame for results
 results <- data.frame(
   Coefficient = coeff_df$Estimate,
   SE = ehw_se[!state_rows],
@@ -828,11 +729,9 @@ results <- data.frame(
 )
 rownames(results) <- rownames(coeff_df)
 
-# Prepare for plotting
 results <- results[order(results$Coefficient), ]
 results$Feature <- factor(rownames(results), levels = rownames(results))
 
-# Plot
 ggplot(results, aes(x = Feature, y = Coefficient)) +
   geom_point(aes(color = Significance), alpha = 0.5) +
   geom_errorbar(aes(ymin = Coefficient - SE, ymax = Coefficient + SE, color = Significance), width = 0.2) +
@@ -843,7 +742,6 @@ ggplot(results, aes(x = Feature, y = Coefficient)) +
        y = "Coefficient") +
   theme_minimal() + theme(axis.text.y = element_text(size = 8))
 ```
-
 
 ```{r}
 imm_asian_only_medicaid_model <- glm(HINS4 ~ as.factor(POBP) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + as.factor(MAR), family = binomial(), data = asian_only_im)
@@ -861,29 +759,23 @@ orig_coefficients <- coef(model)
 
 ehw_se <- sqrt(diag(vcovHC(model, type = "HC0")))
 
-# Get summary and filter out state coefficients
 summary_model <- summary(model)
 state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
 filtered_coefficients <- summary_model$coefficients[!state_rows, ]
 
-# Convert the matrix to a data frame for further manipulation
 coeff_df <- as.data.frame(filtered_coefficients)
 
-# Add robust z-values and p-values
 coeff_df$Robust_z_value <- coeff_df$Estimate / ehw_se[!state_rows]
 coeff_df$Robust_Pr <- 2 * pnorm(abs(coeff_df$Robust_z_value), lower.tail = FALSE)
 
-# Assign significance stars based on the robust p-values
 coeff_df$Signif_Stars <- ifelse(coeff_df$Robust_Pr < 0.001, "***", 
                                 ifelse(coeff_df$Robust_Pr < 0.01, "**", 
                                        ifelse(coeff_df$Robust_Pr < 0.05, "*", 
                                               ifelse(coeff_df$Robust_Pr < 0.1, ".", ""))))
 
-# Printing the formatted summary
 print(coeff_df, digits=3)
 ```
 ```{r}
-# Data frame for results
 results <- data.frame(
   Coefficient = coeff_df$Estimate,
   SE = ehw_se[!state_rows],
@@ -891,11 +783,9 @@ results <- data.frame(
 )
 rownames(results) <- rownames(coeff_df)
 
-# Prepare for plotting
 results <- results[order(results$Coefficient), ]
 results$Feature <- factor(rownames(results), levels = rownames(results))
 
-# Plot
 ggplot(results, aes(x = Feature, y = Coefficient)) +
   geom_point(aes(color = Significance), alpha = 0.5) +
   geom_errorbar(aes(ymin = Coefficient - SE, ymax = Coefficient + SE, color = Significance), width = 0.2) +
@@ -924,29 +814,23 @@ orig_coefficients <- coef(model)
 
 ehw_se <- sqrt(diag(vcovHC(model, type = "HC0")))
 
-# Get summary and filter out state coefficients
 summary_model <- summary(model)
 state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
 filtered_coefficients <- summary_model$coefficients[!state_rows, ]
 
-# Convert the matrix to a data frame for further manipulation
 coeff_df <- as.data.frame(filtered_coefficients)
 
-# Add robust z-values and p-values
 coeff_df$Robust_z_value <- coeff_df$Estimate / ehw_se[!state_rows]
 coeff_df$Robust_Pr <- 2 * pnorm(abs(coeff_df$Robust_z_value), lower.tail = FALSE)
 
-# Assign significance stars based on the robust p-values
 coeff_df$Signif_Stars <- ifelse(coeff_df$Robust_Pr < 0.001, "***", 
                                 ifelse(coeff_df$Robust_Pr < 0.01, "**", 
                                        ifelse(coeff_df$Robust_Pr < 0.05, "*", 
                                               ifelse(coeff_df$Robust_Pr < 0.1, ".", ""))))
 
-# Printing the formatted summary
 print(coeff_df, digits=3)
 ```
 ```{r}
-# Data frame for results
 results <- data.frame(
   Coefficient = coeff_df$Estimate,
   SE = ehw_se[!state_rows],
@@ -954,11 +838,9 @@ results <- data.frame(
 )
 rownames(results) <- rownames(coeff_df)
 
-# Prepare for plotting
 results <- results[order(results$Coefficient), ]
 results$Feature <- factor(rownames(results), levels = rownames(results))
 
-# Plot
 ggplot(results, aes(x = Feature, y = Coefficient)) +
   geom_point(aes(color = Significance), alpha = 0.5) +
   geom_errorbar(aes(ymin = Coefficient - SE, ymax = Coefficient + SE, color = Significance), width = 0.2) +
@@ -986,29 +868,23 @@ orig_coefficients <- coef(model)
 
 ehw_se <- sqrt(diag(vcovHC(model, type = "HC0")))
 
-# Get summary and filter out state coefficients
 summary_model <- summary(model)
 state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
 filtered_coefficients <- summary_model$coefficients[!state_rows, ]
 
-# Convert the matrix to a data frame for further manipulation
 coeff_df <- as.data.frame(filtered_coefficients)
 
-# Add robust z-values and p-values
 coeff_df$Robust_z_value <- coeff_df$Estimate / ehw_se[!state_rows]
 coeff_df$Robust_Pr <- 2 * pnorm(abs(coeff_df$Robust_z_value), lower.tail = FALSE)
 
-# Assign significance stars based on the robust p-values
 coeff_df$Signif_Stars <- ifelse(coeff_df$Robust_Pr < 0.001, "***", 
                                 ifelse(coeff_df$Robust_Pr < 0.01, "**", 
                                        ifelse(coeff_df$Robust_Pr < 0.05, "*", 
                                               ifelse(coeff_df$Robust_Pr < 0.1, ".", ""))))
 
-# Printing the formatted summary
 print(coeff_df, digits=3)
 ```
 ```{r}
-# Data frame for results
 results <- data.frame(
   Coefficient = coeff_df$Estimate,
   SE = ehw_se[!state_rows],
@@ -1016,11 +892,9 @@ results <- data.frame(
 )
 rownames(results) <- rownames(coeff_df)
 
-# Prepare for plotting
 results <- results[order(results$Coefficient), ]
 results$Feature <- factor(rownames(results), levels = rownames(results))
 
-# Plot
 ggplot(results, aes(x = Feature, y = Coefficient)) +
   geom_point(aes(color = Significance), alpha = 0.5) +
   geom_errorbar(aes(ymin = Coefficient - SE, ymax = Coefficient + SE, color = Significance), width = 0.2) +
@@ -1048,29 +922,23 @@ orig_coefficients <- coef(model)
 
 ehw_se <- sqrt(diag(vcovHC(model, type = "HC0")))
 
-# Get summary and filter out state coefficients
 summary_model <- summary(model)
 state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
 filtered_coefficients <- summary_model$coefficients[!state_rows, ]
 
-# Convert the matrix to a data frame for further manipulation
 coeff_df <- as.data.frame(filtered_coefficients)
 
-# Add robust z-values and p-values
 coeff_df$Robust_z_value <- coeff_df$Estimate / ehw_se[!state_rows]
 coeff_df$Robust_Pr <- 2 * pnorm(abs(coeff_df$Robust_z_value), lower.tail = FALSE)
 
-# Assign significance stars based on the robust p-values
 coeff_df$Signif_Stars <- ifelse(coeff_df$Robust_Pr < 0.001, "***", 
                                 ifelse(coeff_df$Robust_Pr < 0.01, "**", 
                                        ifelse(coeff_df$Robust_Pr < 0.05, "*", 
                                               ifelse(coeff_df$Robust_Pr < 0.1, ".", ""))))
 
-# Printing the formatted summary
 print(coeff_df, digits=3)
 ```
 ```{r}
-# Data frame for results
 results <- data.frame(
   Coefficient = coeff_df$Estimate,
   SE = ehw_se[!state_rows],
@@ -1078,11 +946,9 @@ results <- data.frame(
 )
 rownames(results) <- rownames(coeff_df)
 
-# Prepare for plotting
 results <- results[order(results$Coefficient), ]
 results$Feature <- factor(rownames(results), levels = rownames(results))
 
-# Plot
 ggplot(results, aes(x = Feature, y = Coefficient)) +
   geom_point(aes(color = Significance), alpha = 0.5) +
   geom_errorbar(aes(ymin = Coefficient - SE, ymax = Coefficient + SE, color = Significance), width = 0.2) +
@@ -1094,274 +960,43 @@ ggplot(results, aes(x = Feature, y = Coefficient)) +
   theme_minimal() + theme(axis.text.y = element_text(size = 8))
 ```
 
-
-Blinder Oxaca
-
-```{r}
-if (!require(oaxaca)) install.packages("oaxaca")
-library(oaxaca)
-
-oaxaca_data <- processed_data2[processed_data2$PERNP > 0, ]
-oaxaca_data$PERNP <- as.numeric(oaxaca_data$PERNP)
-oaxaca_data <- oaxaca_data[!(oaxaca_data$HISP_dummy == 1 & oaxaca_data$Asian == 1), ]
-```
-
-Ethnic Blinder Oxaca
-```{r}
-oaxaca_data$Ethnic_interest <- ifelse(oaxaca_data$HISP_dummy == 1 | oaxaca_data$Asian == 1, 1, 0)
-oaxaca_data$Ethnic_interest <- as.factor(oaxaca_data$Ethnic_interest)
-
-ethnic_oaxaca <- oaxaca(
-  formula = log(adj_WAGP) ~ AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + as.factor(MAR) + PAP + HINS4 | Ethnic_interest,
-  data = oaxaca_data
-)
-View(summary(ethnic_oaxaca))
-```
-
-```{r}
-summary_model <- summary(ethnic_oaxaca$reg$reg.A)
-state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
-summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
-print(summary_model$coefficients)
-```
-
-```{r}
-summary_model <- summary(ethnic_oaxaca$reg$reg.B)
-state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
-summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
-print(summary_model$coefficients)
-```
-
-
-```{r}
-library(ggplot2)
-
-overall_effects <- data.frame(
-  Effect = c("Endowments", "Coefficients", "Interaction"),
-  Coefficient = c(ethnic_oaxaca$threefold$overall["coef(endowments)"],
-                  ethnic_oaxaca$threefold$overall["coef(coefficients)"],
-                  ethnic_oaxaca$threefold$overall["coef(interaction)"]),
-  StandardError = c(ethnic_oaxaca$threefold$overall["se(endowments)"],
-                    ethnic_oaxaca$threefold$overall["se(coefficients)"],
-                    ethnic_oaxaca$threefold$overall["se(interaction)"])
-)
-
-variable_effects <- data.frame(
-  Variable = rownames(ethnic_oaxaca$threefold$variables),
-  Endowments = ethnic_oaxaca$threefold$variables[, "coef(endowments)"],
-  Endowments_SE = ethnic_oaxaca$threefold$variables[, "se(endowments)"],
-  Coefficients = ethnic_oaxaca$threefold$variables[, "coef(coefficients)"],
-  Coefficients_SE = ethnic_oaxaca$threefold$variables[, "se(coefficients)"]
-)
-
-selected_variables <- c("AGEP", "SEX", "Citizen", "as.factor(ENG)2", "as.factor(ENG)3",
-                        "as.factor(ENG)4", "DIS", "Unemployed", "High_School_Grad",
-                        "Bachelors_Degree", "PAP", "HINS4",
-                        "SEX:Citizen", "SEX:DIS")
-
-filtered_variable_effects <- variable_effects[variable_effects$Variable %in% selected_variables, ]
-
-ggplot(filtered_variable_effects, aes(x = Variable, y = Endowments, fill = "Endowments")) +
-  geom_col(color = "black", position = position_dodge(width = 0.9)) +
-  geom_errorbar(aes(ymin = Endowments - Endowments_SE, ymax = Endowments + Endowments_SE), width = 0.2, position = position_dodge(width = 0.9)) +
-  labs(title = "Endowment Effects for Selected Variables - Ethnic interest", x = NULL, y = "Endowment Effect") +
-  scale_fill_manual(values = c("Endowments" = "white")) +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-
-ggplot(filtered_variable_effects, aes(x = Variable, y = Coefficients, fill = "Coefficients")) +
-  geom_col(color = "black", position = position_dodge(width = 0.9)) +
-  geom_errorbar(aes(ymin = Coefficients - Coefficients_SE, ymax = Coefficients + Coefficients_SE), width = 0.2, position = position_dodge(width = 0.9)) +
-  labs(title = "Coefficient Effects for Selected Variables - Ethnic interest", x = NULL, y = "Coefficient Effect") +
-  scale_fill_manual(values = c("Coefficients" = "white")) +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-```
-```{r}
-coefficients_A <- summary(ethnic_oaxaca$reg$reg.A)$coefficients
-coefficients_A <- coefficients_A[!grepl("^as\\.factor\\(ST\\)|\\(Intercept\\)", rownames(coefficients_A)), ]
-coefficients_A_df <- data.frame(
-  Variable = rownames(coefficients_A),
-  Coefficient = coefficients_A[, "Estimate"],
-  StdError = coefficients_A[, "Std. Error"],
-  Model = "Regression Asians/hispanics"
-)
-
-coefficients_B <- summary(ethnic_oaxaca$reg$reg.B)$coefficients
-coefficients_B <- coefficients_B[!grepl("^as\\.factor\\(ST\\)|\\(Intercept\\)", rownames(coefficients_B)), ]
-coefficients_B_df <- data.frame(
-  Variable = rownames(coefficients_B),
-  Coefficient = coefficients_B[, "Estimate"],
-  StdError = coefficients_B[, "Std. Error"],
-  Model = "Regression non-Asians and non-Hispanics"
-)
-
-all_coefficients <- rbind(coefficients_A_df, coefficients_B_df)
-
-ggplot(all_coefficients, aes(x = Variable, y = Coefficient, fill = Model)) +
-  geom_bar(stat = "identity", position = position_dodge(width = 0.8), width = 0.7) +
-  geom_errorbar(aes(ymin = Coefficient - StdError, ymax = Coefficient + StdError), 
-                position = position_dodge(width = 0.8), width = 0.25) +
-  coord_flip() +
-  scale_fill_manual(values = c("grey70", "grey30")) +
-  labs(title = "Comparison of Coefficients",
-       x = "Variables",
-       y = "Coefficients") +
-  theme_minimal() +
-  theme(legend.position = "top",
-        plot.title = element_text(face = "bold", hjust = 0.5, vjust = 1, size = 12),
-        plot.margin = unit(c(1.5, 1, 1, 1), "lines"))  # Adjust the top margin to give more space for the title
-```
-
-Migrant Blinder Oxaca
-```{r}
-migrant_oaxaca <- oaxaca(
-  formula = log(adj_WAGP) ~  AGEP + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + as.factor(MAR) + PAP + HINS4 | immigrant,
-  data = oaxaca_data
-)
-View(summary(migrant_oaxaca))
-```
-
-```{r}
-summary_model <- summary(migrant_oaxaca$reg$reg.A)
-state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
-summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
-print(summary_model$coefficients)
-```
-
-```{r}
-summary_model <- summary(migrant_oaxaca$reg$reg.B)
-state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
-summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
-print(summary_model$coefficients)
-```
-
-```{r}
-overall_effects <- data.frame(
-  Effect = c("Endowments", "Coefficients", "Interaction"),
-  Coefficient = c(migrant_oaxaca$threefold$overall["coef(endowments)"],
-                  migrant_oaxaca$threefold$overall["coef(coefficients)"],
-                  migrant_oaxaca$threefold$overall["coef(interaction)"]),
-  StandardError = c(migrant_oaxaca$threefold$overall["se(endowments)"],
-                    migrant_oaxaca$threefold$overall["se(coefficients)"],
-                    migrant_oaxaca$threefold$overall["se(interaction)"])
-)
-
-variable_effects <- data.frame(
-  Variable = rownames(migrant_oaxaca$threefold$variables),
-  Endowments = migrant_oaxaca$threefold$variables[, "coef(endowments)"],
-  Endowments_SE = migrant_oaxaca$threefold$variables[, "se(endowments)"],
-  Coefficients = migrant_oaxaca$threefold$variables[, "coef(coefficients)"],
-  Coefficients_SE = migrant_oaxaca$threefold$variables[, "se(coefficients)"]
-)
-
-selected_variables <- c("AGEP", "SEX", "Citizen", "as.factor(ENG)2", "as.factor(ENG)3",
-                        "as.factor(ENG)4", "DIS", "Unemployed", "High_School_Grad",
-                        "Bachelors_Degree", "HISP_dummy", "PAP", "HINS4",
-                        "SEX:Citizen", "SEX:DIS")
-
-filtered_variable_effects <- variable_effects[variable_effects$Variable %in% selected_variables, ]
-
-ggplot(filtered_variable_effects, aes(x = Variable, y = Endowments, fill = "Endowments")) +
-  geom_col(color = "black", position = position_dodge(width = 0.9)) +
-  geom_errorbar(aes(ymin = Endowments - Endowments_SE, ymax = Endowments + Endowments_SE), width = 0.2, position = position_dodge(width = 0.9)) +
-  labs(title = "Endowment Effects for Selected Variables  - immigrants", x = NULL, y = "Endowment Effect") +
-  scale_fill_manual(values = c("Endowments" = "white")) +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-
-ggplot(filtered_variable_effects, aes(x = Variable, y = Coefficients, fill = "Coefficients")) +
-  geom_col(color = "black", position = position_dodge(width = 0.9)) +
-  geom_errorbar(aes(ymin = Coefficients - Coefficients_SE, ymax = Coefficients + Coefficients_SE), width = 0.2, position = position_dodge(width = 0.9)) +
-  labs(title = "Coefficient Effects for Selected Variables - immigrants", x = NULL, y = "Coefficient Effect") +
-  scale_fill_manual(values = c("Coefficients" = "white")) +
-  theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1))
-```
-
-```{r}
-coefficients_A <- summary(migrant_oaxaca$reg$reg.A)$coefficients
-coefficients_A <- coefficients_A[!grepl("^as\\.factor\\(ST\\)|\\(Intercept\\)", rownames(coefficients_A)), ]
-coefficients_A_df <- data.frame(
-  Variable = rownames(coefficients_A),
-  Coefficient = coefficients_A[, "Estimate"],
-  StdError = coefficients_A[, "Std. Error"],
-  Model = "Regression immigrants"
-)
-
-coefficients_B <- summary(migrant_oaxaca$reg$reg.B)$coefficients
-coefficients_B <- coefficients_B[!grepl("^as\\.factor\\(ST\\)|\\(Intercept\\)", rownames(coefficients_B)), ]
-coefficients_B_df <- data.frame(
-  Variable = rownames(coefficients_B),
-  Coefficient = coefficients_B[, "Estimate"],
-  StdError = coefficients_B[, "Std. Error"],
-  Model = "Regression native-born"
-)
-
-all_coefficients <- rbind(coefficients_A_df, coefficients_B_df)
-
-ggplot(all_coefficients, aes(x = Variable, y = Coefficient, fill = Model)) +
-  geom_bar(stat = "identity", position = position_dodge(width = 0.8), width = 0.7) +
-  geom_errorbar(aes(ymin = Coefficient - StdError, ymax = Coefficient + StdError), 
-                position = position_dodge(width = 0.8), width = 0.25) +
-  coord_flip() +
-  scale_fill_manual(values = c("grey70", "grey30")) +
-  labs(title = "Comparison of Coefficients",
-       x = "Variables",
-       y = "Coefficients") +
-  theme_minimal() +
-  theme(legend.position = "top")
-```
-
-
-
-
 EDA
 ```{r}
 library(ggplot2)
 library(gridExtra)
-library(scales)  # Ensure scales is loaded for percent formatting
+library(scales)
 
 generate_and_save_plots <- function(data, variable, file_name) {
-  # Base plot with aes_string for dynamic variable use
   base_plot <- ggplot(data, aes_string(x = variable, y = "..prop..", group = "1")) +
     geom_bar(aes(y = ..prop..), stat = "count", fill = "gray") +
     scale_y_continuous(labels = percent_format()) +
     geom_text(stat = "count", aes(label = percent(..prop..), y = ..prop..), 
               vjust = -0.5, position = position_stack(vjust = 0.5))
 
-  # General distribution plot
   p1 <- base_plot +
     labs(title = paste("General Distribution of", variable), x = variable, y = "Proportion")
   
-  # Distribution by citizen status
   p2 <- base_plot +
     facet_grid(. ~ Citizen) +
     labs(title = paste("Distribution of", variable, "by Citizen Status"), x = variable, y = "Proportion")
   
-  # Distribution by immigrant status
   p3 <- base_plot +
     facet_grid(. ~ immigrant) +
     labs(title = paste("Distribution of", variable, "by Immigrant Status"), x = variable, y = "Proportion")
 
-  # Distribution by Asian dummy status
   p4 <- base_plot +
     facet_grid(. ~ asian_dummy) +
     labs(title = paste("Distribution of", variable, "by Asian identification"), x = variable, y = "Proportion")
 
-  # Distribution by Hispanic dummy status
   p5 <- base_plot +
     facet_grid(. ~ HISP_dummy) +
     labs(title = paste("Distribution of", variable, "by Hispanic identification"), x = variable, y = "Proportion")
   
-  # Combine plots vertically
   combined_plot <- grid.arrange(p1, p2, p3, p4, p5, ncol = 1)
   
-  # Save the combined plot to a file
   ggsave(file_name, combined_plot, width = 8, height = 30)  # Adjusted height to accommodate more plots
 }
 
-# Generate and save plots for each variable
 generate_and_save_plots(processed_data2, "PAP_binary", "plots_PAP_binary.png")
 generate_and_save_plots(processed_data2, "HINS4", "plots_HINS4.png")
 generate_and_save_plots(processed_data2, "Unemployed", "plots_Unemployed.png")
