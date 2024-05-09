@@ -1164,7 +1164,7 @@ filtered_variable_effects <- variable_effects[variable_effects$Variable %in% sel
 ggplot(filtered_variable_effects, aes(x = Variable, y = Endowments, fill = "Endowments")) +
   geom_col(color = "black", position = position_dodge(width = 0.9)) +
   geom_errorbar(aes(ymin = Endowments - Endowments_SE, ymax = Endowments + Endowments_SE), width = 0.2, position = position_dodge(width = 0.9)) +
-  labs(title = "Endowment Effects for Selected Variables", x = NULL, y = "Endowment Effect") +
+  labs(title = "Endowment Effects for Selected Variables - Ethnic interest", x = NULL, y = "Endowment Effect") +
   scale_fill_manual(values = c("Endowments" = "white")) +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
@@ -1172,7 +1172,7 @@ ggplot(filtered_variable_effects, aes(x = Variable, y = Endowments, fill = "Endo
 ggplot(filtered_variable_effects, aes(x = Variable, y = Coefficients, fill = "Coefficients")) +
   geom_col(color = "black", position = position_dodge(width = 0.9)) +
   geom_errorbar(aes(ymin = Coefficients - Coefficients_SE, ymax = Coefficients + Coefficients_SE), width = 0.2, position = position_dodge(width = 0.9)) +
-  labs(title = "Coefficient Effects for Selected Variables", x = NULL, y = "Coefficient Effect") +
+  labs(title = "Coefficient Effects for Selected Variables - Ethnic interest", x = NULL, y = "Coefficient Effect") +
   scale_fill_manual(values = c("Coefficients" = "white")) +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
@@ -1184,7 +1184,7 @@ coefficients_A_df <- data.frame(
   Variable = rownames(coefficients_A),
   Coefficient = coefficients_A[, "Estimate"],
   StdError = coefficients_A[, "Std. Error"],
-  Model = "Regression A"
+  Model = "Regression Asians/hispanics"
 )
 
 coefficients_B <- summary(ethnic_oaxaca$reg$reg.B)$coefficients
@@ -1193,7 +1193,7 @@ coefficients_B_df <- data.frame(
   Variable = rownames(coefficients_B),
   Coefficient = coefficients_B[, "Estimate"],
   StdError = coefficients_B[, "Std. Error"],
-  Model = "Regression B"
+  Model = "Regression non-Asians and non-Hispanics"
 )
 
 all_coefficients <- rbind(coefficients_A_df, coefficients_B_df)
@@ -1204,11 +1204,13 @@ ggplot(all_coefficients, aes(x = Variable, y = Coefficient, fill = Model)) +
                 position = position_dodge(width = 0.8), width = 0.25) +
   coord_flip() +
   scale_fill_manual(values = c("grey70", "grey30")) +
-  labs(title = "Comparison of Coefficients: Regression A vs. B",
+  labs(title = "Comparison of Coefficients",
        x = "Variables",
        y = "Coefficients") +
   theme_minimal() +
-  theme(legend.position = "top")
+  theme(legend.position = "top",
+        plot.title = element_text(face = "bold", hjust = 0.5, vjust = 1, size = 12),
+        plot.margin = unit(c(1.5, 1, 1, 1), "lines"))  # Adjust the top margin to give more space for the title
 ```
 
 Migrant Blinder Oxaca
@@ -1263,7 +1265,7 @@ filtered_variable_effects <- variable_effects[variable_effects$Variable %in% sel
 ggplot(filtered_variable_effects, aes(x = Variable, y = Endowments, fill = "Endowments")) +
   geom_col(color = "black", position = position_dodge(width = 0.9)) +
   geom_errorbar(aes(ymin = Endowments - Endowments_SE, ymax = Endowments + Endowments_SE), width = 0.2, position = position_dodge(width = 0.9)) +
-  labs(title = "Endowment Effects for Selected Variables", x = NULL, y = "Endowment Effect") +
+  labs(title = "Endowment Effects for Selected Variables  - immigrants", x = NULL, y = "Endowment Effect") +
   scale_fill_manual(values = c("Endowments" = "white")) +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
@@ -1271,7 +1273,7 @@ ggplot(filtered_variable_effects, aes(x = Variable, y = Endowments, fill = "Endo
 ggplot(filtered_variable_effects, aes(x = Variable, y = Coefficients, fill = "Coefficients")) +
   geom_col(color = "black", position = position_dodge(width = 0.9)) +
   geom_errorbar(aes(ymin = Coefficients - Coefficients_SE, ymax = Coefficients + Coefficients_SE), width = 0.2, position = position_dodge(width = 0.9)) +
-  labs(title = "Coefficient Effects for Selected Variables", x = NULL, y = "Coefficient Effect") +
+  labs(title = "Coefficient Effects for Selected Variables - immigrants", x = NULL, y = "Coefficient Effect") +
   scale_fill_manual(values = c("Coefficients" = "white")) +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1))
@@ -1284,7 +1286,7 @@ coefficients_A_df <- data.frame(
   Variable = rownames(coefficients_A),
   Coefficient = coefficients_A[, "Estimate"],
   StdError = coefficients_A[, "Std. Error"],
-  Model = "Regression A"
+  Model = "Regression immigrants"
 )
 
 coefficients_B <- summary(migrant_oaxaca$reg$reg.B)$coefficients
@@ -1293,7 +1295,7 @@ coefficients_B_df <- data.frame(
   Variable = rownames(coefficients_B),
   Coefficient = coefficients_B[, "Estimate"],
   StdError = coefficients_B[, "Std. Error"],
-  Model = "Regression B"
+  Model = "Regression native-born"
 )
 
 all_coefficients <- rbind(coefficients_A_df, coefficients_B_df)
@@ -1304,7 +1306,7 @@ ggplot(all_coefficients, aes(x = Variable, y = Coefficient, fill = Model)) +
                 position = position_dodge(width = 0.8), width = 0.25) +
   coord_flip() +
   scale_fill_manual(values = c("grey70", "grey30")) +
-  labs(title = "Comparison of Coefficients: Regression A vs. B",
+  labs(title = "Comparison of Coefficients",
        x = "Variables",
        y = "Coefficients") +
   theme_minimal() +
@@ -1318,26 +1320,45 @@ EDA
 ```{r}
 library(ggplot2)
 library(gridExtra)
+library(scales)  # Ensure scales is loaded for percent formatting
 
 generate_and_save_plots <- function(data, variable, file_name) {
-  p1 <- ggplot(data, aes_string(x = variable)) +
-    geom_bar(fill = "blue") +
-    labs(title = paste("General Distribution of", variable), x = variable, y = "Count")
+  # Base plot with aes_string for dynamic variable use
+  base_plot <- ggplot(data, aes_string(x = variable, y = "..prop..", group = "1")) +
+    geom_bar(aes(y = ..prop..), stat = "count", fill = "gray") +
+    scale_y_continuous(labels = percent_format()) +
+    geom_text(stat = "count", aes(label = percent(..prop..), y = ..prop..), 
+              vjust = -0.5, position = position_stack(vjust = 0.5))
+
+  # General distribution plot
+  p1 <- base_plot +
+    labs(title = paste("General Distribution of", variable), x = variable, y = "Proportion")
   
-  p2 <- ggplot(data, aes_string(x = variable)) +
-    geom_bar(fill = "blue") +
+  # Distribution by citizen status
+  p2 <- base_plot +
     facet_grid(. ~ Citizen) +
-    labs(title = paste("Distribution of", variable, "by Citizen Status"), x = variable, y = "Count")
+    labs(title = paste("Distribution of", variable, "by Citizen Status"), x = variable, y = "Proportion")
   
-  p3 <- ggplot(data, aes_string(x = variable)) +
-    geom_bar(fill = "blue") +
+  # Distribution by immigrant status
+  p3 <- base_plot +
     facet_grid(. ~ immigrant) +
-    labs(title = paste("Distribution of", variable, "by Immigrant Status"), x = variable, y = "Count")
+    labs(title = paste("Distribution of", variable, "by Immigrant Status"), x = variable, y = "Proportion")
+
+  # Distribution by Asian dummy status
+  p4 <- base_plot +
+    facet_grid(. ~ asian_dummy) +
+    labs(title = paste("Distribution of", variable, "by Asian identification"), x = variable, y = "Proportion")
+
+  # Distribution by Hispanic dummy status
+  p5 <- base_plot +
+    facet_grid(. ~ HISP_dummy) +
+    labs(title = paste("Distribution of", variable, "by Hispanic identification"), x = variable, y = "Proportion")
   
-  combined_plot <- grid.arrange(p1, p2, p3, ncol = 1)
+  # Combine plots vertically
+  combined_plot <- grid.arrange(p1, p2, p3, p4, p5, ncol = 1)
   
   # Save the combined plot to a file
-  ggsave(file_name, combined_plot, width = 8, height = 18)
+  ggsave(file_name, combined_plot, width = 8, height = 30)  # Adjusted height to accommodate more plots
 }
 
 # Generate and save plots for each variable
