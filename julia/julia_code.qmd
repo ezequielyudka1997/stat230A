@@ -11,6 +11,8 @@ library(MASS)
 library(corrplot)
 library(sandwich)
 library(caret)
+library(knitr)
+library(kableExtra)
 ```
 
 # Reading the Data In:
@@ -207,10 +209,6 @@ processed_data$ENG[is.na(processed_data$ENG)] <- 0
 ```
 
 ```{r}
-#colnames(processed_data)
-```
-
-```{r}
 processed_data$Years_naturalized[processed_data$Foreign_born == 0] <- 0
 processed_data$Years_in_US[processed_data$Foreign_born == 0] <- 0
 processed_data$Years_naturalized[processed_data$CIT == 5] <- 0
@@ -218,10 +216,6 @@ processed_data = processed_data%>%filter(CIT != 2)
 processed_data$wb50birth <- processed_data$FER
 processed_data$wb50birth[is.na(processed_data$FER) &
                          (processed_data$AGEP >= 50 | processed_data$SEX == 0)] <- 0
-```
-
-```{r}
-#colSums(is.na(processed_data))
 ```
 
 ```{r}
@@ -449,7 +443,7 @@ corrplot(cor_matrix, method = "color",
 
 ## Predicting Wages in America: 
 
-### mini model and summary
+### model (1) 
 ```{r}
 mini_model = lm(WAGP ~ as.factor(RAC1P) + AGEP +  SEX*Citizen + as.factor(ENG) + SEX*DIS + Unemployed  + wb50birth + as.factor(ST) + High_School_Grad  + Bachelors_Degree + HISP_dummy + PAP + HINS4 + as.factor(MAR), data = processed_data2)
 ```
@@ -471,7 +465,7 @@ r_squared_adjusted <- summary_model$adj.r.squared
 cat("R-squared:", r_squared, "\n")
 cat("Adjusted R-squared:", r_squared_adjusted, "\n")
 ```
-### corrected mini summary
+### model (1) summary
 
 ```{r}
 # Function to compute EHW robust standard errors
@@ -534,8 +528,15 @@ results <- data.frame(orig_coefficients, orig_t_values, orig_p_values, stars,
 rownames(results) <- names(orig_coefficients)
 
 # Display results
-print(results)
+#print(results)
 ```
+```{r, results='asis'}
+model1_results = kable(results, format = "latex", booktabs = TRUE)%>%
+  kable_styling(latex_options = "scale_down")
+print(model1_results)
+```
+
+
 ### coef plot
 ```{r}
 # Prepare data for plotting
@@ -583,31 +584,6 @@ qqline(resid(mini_model_plotting))
 mtext("Model (1) with Log-transformed Wage", side = 3, line = 0.5, cex = 0.8)
 
 ```
-### model0 and summary
-
-```{r, eval=FALSE}
-model0 = lm(WAGP ~ as.factor(RAC1P) + AGEP +  SEX*Citizen + as.factor(ENG) + SEX*DIS + Unemployed + wb50birth + as.factor(ST) + High_School_Grad + Bachelors_Degree + HISP_dummy + PAP + HINS4 + as.factor(MAR) + immigrant, data = processed_data2)
-```
-
-```{r, eval=FALSE}
-# Get the summary of the model
-summary_model <- summary(model0)
-
-# Filter out rows related to state coefficients
-state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
-summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
-
-summary_model
-```
-
-### resid plot
-```{r}
-# produce residual vs. fitted plot 
-#plot(fitted(model0), resid(model0)) 
-  
-# add a horizontal line at 0  
-#abline(0,0) 
-```
 ### box plots 1 and 2
 ```{r}
 # Plot
@@ -626,7 +602,7 @@ grid.arrange(boxplot1, boxplot2, ncol = 2)
 
 ## Predicting Immigrants Wages: Differences across Wages for immigrants of different Races
 
-### mini model and summary
+### model (3)
 ```{r}
 mini_model = lm(WAGP ~ as.factor(RAC1P) + AGEP +  SEX*Citizen + as.factor(ENG) + SEX*DIS + Unemployed + as.factor(ST) + wb50birth + High_School_Grad  + Bachelors_Degree + HISP_dummy + PAP + HINS4 + as.factor(MAR) + Years_in_US, data = immigrants_only2)
 ```
@@ -649,7 +625,7 @@ cat("R-squared:", r_squared, "\n")
 cat("Adjusted R-squared:", r_squared_adjusted, "\n")
 ```
 
-### corrected mini summary
+### model (3) summary
 ```{r}
 
 # Compute EHW robust standard errors
@@ -706,9 +682,13 @@ results <- data.frame(orig_coefficients, orig_t_values, orig_p_values, stars,
 rownames(results) <- names(orig_coefficients)
 
 # Display results
-print(results)
+#print(results)
 ```
-
+```{r, results='asis'}
+model3_results = kable(results, format = "latex", booktabs = TRUE)%>%
+  kable_styling(latex_options = "scale_down")
+print(model3_results)
+```
 ### coef plot
 ```{r}
 # Prepare data for plotting
@@ -736,27 +716,9 @@ ggplot(plot_data, aes(x = Feature, y = Coefficient)) +
     theme_minimal() + theme(axis.text.y = element_text(size = 8))
 ```
 
-### model 1 and summary
-
-```{r, eval = FALSE}
-model1 = lm(WAGP ~ as.factor(RAC1P) + AGEP +   SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + HISP_dummy + as.factor(MAR) + PAP + HINS4 + Years_in_US, data = immigrants_only2)
-```
-
-```{r, eval=FALSE}
-# Get the summary of the model
-summary_model <- summary(model1)
-
-# Filter out rows related to state coefficients
-state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
-summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
-
-# Print the refined summary
-summary_model
-```
-
 ## Predicting non-Immigrants Wages: Differences across Wages for non-immigrants of different Races
 
-### mini model and summary
+### model (2)
 ```{r}
 mini_model = lm(WAGP ~ as.factor(RAC1P) + AGEP + as.factor(ENG) + SEX*DIS + Unemployed + as.factor(ST) + wb50birth + High_School_Grad  + Bachelors_Degree + HISP_dummy + PAP + HINS4 + as.factor(MAR), data = non_immigrants)
 ```
@@ -779,7 +741,7 @@ cat("R-squared:", r_squared, "\n")
 cat("Adjusted R-squared:", r_squared_adjusted, "\n")
 ```
 
-### corrected mini summary
+### model (2) summary
 ```{r}
 
 # Compute EHW robust standard errors
@@ -840,8 +802,15 @@ results <- data.frame(orig_coefficients, orig_t_values, orig_p_values, stars,
 rownames(results) <- names(orig_coefficients)
 
 # Display results
-print(results)
+#print(results)
 ```
+
+```{r, results='asis'}
+model2_results = kable(results, format = "latex", booktabs = TRUE)%>%
+  kable_styling(latex_options = "scale_down")
+print(model2_results)
+```
+
 
 ### coef plot 
 
@@ -869,24 +838,6 @@ ggplot(plot_data, aes(x = Feature, y = Coefficient)) +
          x = "Feature",
          y = "Coefficient") +
     theme_minimal() + theme(axis.text.y = element_text(size = 8))
-```
-
-### model 1.2 and summary
-
-```{r, eval=FALSE}
-model1.2 = lm(WAGP ~ as.factor(RAC1P) + AGEP +  SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + HISP_dummy + as.factor(MAR) + PAP + HINS4, data = non_immigrants)
-```
-
-```{r, eval=FALSE}
-# Get the summary of the model
-summary_model <- summary(model1.2)
-
-# Filter out rows related to state coefficients
-state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
-summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
-
-# Print the refined summary
-summary_model
 ```
 
 ## Predicting Wages for Asian: Differences across Wages for Asian immigrants and from top 5 countries and also non-immigrants
@@ -975,31 +926,8 @@ grid.arrange(density_plot_rac1p, density_plot_rac1p2, density_plot_asian, densit
 
 ```
 
-### model 1 for asian immigrants accounting for country of origin
+### model (4) : model 1 for asian immigrants accounting for country of origin
 
-```{r, eval=FALSE}
-model2 = lm(WAGP ~ AGEP +  SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + HISP_dummy + PAP + HINS4 + as.factor(MAR) + as.factor(POBP) + Years_in_US, data = asian_only_im)
-```
-
-```{r, eval=FALSE}
-# Get the summary of the model
-summary_model <- summary(model2)
-
-# Filter out rows related to state coefficients
-state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
-summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
-
-# Print the refined summary
-# Extract R-squared and adjusted R-squared values
-r_squared <- summary_model$r.squared
-r_squared_adjusted <- summary_model$adj.r.squared
-
-# Print the values with labels
-cat("R-squared:", r_squared, "\n")
-cat("Adjusted R-squared:", r_squared_adjusted, "\n")
-```
-
-### mini model and summary: for asian immigrants accounting for country of origin
 ```{r}
 mini_model = lm(WAGP ~ AGEP +  SEX*Citizen + as.factor(ENG) + SEX*DIS + Unemployed + as.factor(ST) + wb50birth +  High_School_Grad + Bachelors_Degree + PAP + HINS4 + as.factor(MAR) + as.factor(POBP) + Years_in_US, data = asian_only_im)
 ```
@@ -1015,7 +943,7 @@ summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
 # Print the refined summary
 summary_model
 ```
-### corrected mini summary
+### model (4) summary
 ```{r}
 
 # Compute EHW robust standard errors
@@ -1072,7 +1000,13 @@ results <- data.frame(orig_coefficients, orig_t_values, orig_p_values, stars,
 rownames(results) <- names(orig_coefficients)
 
 # Display results
-print(results)
+#print(results)
+```
+
+```{r, results='asis'}
+model4_results = kable(results, format = "latex", booktabs = TRUE)%>%
+  kable_styling(latex_options = "scale_down")
+print(model4_results)
 ```
 ### coef plot
 ```{r}
@@ -1114,7 +1048,7 @@ boxplot4 <-  ggplot(asian_only_im, aes(x = factor(POBP),
 grid.arrange(boxplot3, boxplot4, ncol = 2)
 ```
 
-### model 2 for all asians: using immigrants instead of citizen for comparison 
+### model (5) model 2 for all asians: using immigrants instead of citizen for comparison 
 
 ```{r}
 model2.2 = lm(WAGP ~ AGEP + SEX*immigrant + as.factor(ENG) + SEX*DIS + Unemployed + as.factor(ST) + wb50birth + High_School_Grad + Bachelors_Degree + PAP + HINS4 + as.factor(MAR) , data = asian_only)
@@ -1138,7 +1072,7 @@ cat("R-squared:", r_squared, "\n")
 cat("Adjusted R-squared:", r_squared_adjusted, "\n")
 ```
 
-### correct summary model 2.2
+### model (5) summary
 ```{r}
 
 # Compute EHW robust standard errors
@@ -1196,7 +1130,13 @@ results <- data.frame(orig_coefficients, orig_t_values, orig_p_values, stars,
 rownames(results) <- names(orig_coefficients)
 
 # Display results
-print(results)
+#print(results)
+```
+
+```{r, results='asis'}
+model5_results = kable(results, format = "latex", booktabs = TRUE)%>%
+  kable_styling(latex_options = "scale_down")
+print(model5_results)
 ```
 
 ```{r}
@@ -1332,25 +1272,8 @@ grid.arrange(density_plot_rac1p, density_plot_rac1p2, density_plot_hisp, density
 ```
 
 
-### HISP model 1 for immigrants by POBP
+### Model (6) HISP model 1 for immigrants by POBP
 
-```{r, eval=FALSE}
-model3 = lm(WAGP ~ as.factor(RAC1P) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + wb50birth+ Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + PAP + HINS4 + as.factor(MAR) + as.factor(POBP) + Years_in_US, data = hisp_only_im)
-```
-
-```{r, eval=FALSE}
-# Get the summary of the model
-summary_model <- summary(model3)
-
-# Filter out rows related to state coefficients
-state_rows <- grepl("^as\\.factor\\(ST\\)", rownames(summary_model$coefficients))
-summary_model$coefficients <- summary_model$coefficients[!state_rows, ]
-
-summary_model
-```
-
-
-### mini model and summary
 ```{r}
 mini_model = lm(WAGP ~  as.factor(RAC1P) + AGEP + SEX*Citizen + as.factor(ENG) + SEX*DIS + Unemployed + as.factor(ST) + High_School_Grad + Bachelors_Degree + PAP + HINS4 + as.factor(MAR) + as.factor(POBP) + Years_in_US, data = hisp_only_im)
 ```
@@ -1374,7 +1297,7 @@ cat("Adjusted R-squared:", r_squared_adjusted, "\n")
 ```
 
 
-### correct summary mini_model
+### model (6) summary
 
 ```{r}
 
@@ -1433,7 +1356,13 @@ results <- data.frame(orig_coefficients, orig_t_values, orig_p_values, stars,
 rownames(results) <- names(orig_coefficients)
 
 # Display results
-print(results)
+#print(results)
+```
+
+```{r, results='asis'}
+model6_results = kable(results, format = "latex", booktabs = TRUE)%>%
+  kable_styling(latex_options = "scale_down")
+print(model6_results)
 ```
 ### coef plot 
 
@@ -1480,7 +1409,7 @@ grid.arrange(boxplot5, boxplot6, ncol = 2)
 ```
 
 
-### HISP model 2 for all hispanics using immigrant for comparison
+### model (7) HISP model 2 for all hispanics using immigrant for comparison
 
 ```{r}
 model2.2 = lm(WAGP ~ as.factor(RAC1P) + AGEP + SEX*immigrant + as.factor(ENG) + SEX*DIS + Unemployed + wb50birth+ as.factor(ST) + High_School_Grad + Bachelors_Degree + PAP + HINS4 + as.factor(MAR), data = hisp_only)
@@ -1505,7 +1434,7 @@ cat("Adjusted R-squared:", r_squared_adjusted, "\n")
 ```
 
 
-### correct summary model 2.2
+### model (7) summary
 ```{r}
 
 # Compute EHW robust standard errors
@@ -1563,8 +1492,16 @@ results <- data.frame(orig_coefficients, orig_t_values, orig_p_values, stars,
 rownames(results) <- names(orig_coefficients)
 
 # Display results
-print(results)
+#print(results)
 ```
+
+```{r, results='asis'}
+model7_results = kable(results, format = "latex", booktabs = TRUE)%>%
+  kable_styling(latex_options = "scale_down")
+print(model7_results)
+```
+
+### coef plot
 
 ```{r}
 # Prepare data for plotting
@@ -1591,5 +1528,7 @@ ggplot(plot_data, aes(x = Feature, y = Coefficient)) +
          y = "Coefficient") +
     theme_minimal() + theme(axis.text.y = element_text(size = 8))
 ```
+
+
 
 
